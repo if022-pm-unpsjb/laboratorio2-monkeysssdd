@@ -4,9 +4,9 @@ defmodule Libremarket.Infracciones do
     infraccion = :rand.uniform(100) <= 30
 
     if infraccion do
-      {:error}
+      {:hay_infraccion}
     else
-      {:ok}
+      {:no_hay_infraccion}
     end
 
   end
