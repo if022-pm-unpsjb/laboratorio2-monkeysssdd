@@ -4,7 +4,9 @@ defmodule Libremarket.Envios do
     :rand.uniform(1000)
   end
 
-
+  def agendar_envio(id) do
+    {:envio_agendado, id}
+  end
 end
 
 defmodule Libremarket.Envios.Server do
@@ -31,6 +33,9 @@ defmodule Libremarket.Envios.Server do
     GenServer.call(pid, :listar_envios)
   end
 
+  def agendar_envio(id, pid \\ __MODULE__) do
+    GenServer.call(pid, {:agendar_envio, id})
+  end
   # Callbacks
 
   @doc """
@@ -48,6 +53,12 @@ defmodule Libremarket.Envios.Server do
   def handle_call({:calcular_costo, id}, _from, state) do
     result = Libremarket.Envios.calcular_costo()
     {:reply, result, [{id, result} | state]}
+  end
+
+  @impl true
+  def handle_call({:agendar_envio, id}, _from, state) do
+    result = Libremarket.Envios.agendar_envio(id)
+    {:reply, result, state}
   end
 
   @impl true

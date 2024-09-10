@@ -1,12 +1,12 @@
 defmodule Libremarket.Pagos do
 
-  def autorizarPago() do
+  def autorizarPago(id) do
     pago = :rand.uniform(100) <= 70
 
     if pago do
       {:pago_autorizado}
     else
-      {:pago_desautorizado}
+      {:pago_rechazado}
     end
 
   end
@@ -49,7 +49,7 @@ defmodule Libremarket.Pagos.Server do
   """
   @impl true
   def handle_call({:autorizarPago, id}, _from, state) do
-    result = Libremarket.Pagos.autorizarPago()
+    result = Libremarket.Pagos.autorizarPago(id)
     {:reply, result, [{id, result} | state]}
   end
 end
