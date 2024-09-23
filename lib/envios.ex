@@ -1,5 +1,4 @@
 defmodule Libremarket.Envios do
-
   def calcular_costo() do
     :rand.uniform(1000)
   end
@@ -10,22 +9,15 @@ defmodule Libremarket.Envios do
 end
 
 defmodule Libremarket.Envios.Server do
-  @moduledoc """
-  Infracciones
-  """
-
   use GenServer
 
   # API del cliente
 
-  @doc """
-  Crea un nuevo servidor de Infracciones
-  """
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  def calcular_costo(id \\ 0, pid \\ __MODULE__) do
+  def calcular_costo(id, pid \\ __MODULE__) do
     GenServer.call(pid, {:calcular_costo, id})
   end
 
@@ -36,29 +28,29 @@ defmodule Libremarket.Envios.Server do
   def agendar_envio(id, pid \\ __MODULE__) do
     GenServer.call(pid, {:agendar_envio, id})
   end
+
   # Callbacks
 
-  @doc """
-  Inicializa el estado del servidor
-  """
   @impl true
-  def init(state) do
-    {:ok, state}
+  def init(_opts) do
+    {:ok, %{}}
   end
 
-  @doc """
-  Callback para un call :comprar
-  """
   @impl true
   def handle_call({:calcular_costo, id}, _from, state) do
     result = Libremarket.Envios.calcular_costo()
-    {:reply, result, [{id, result} | state]}
+    nuevo_estado = Map.update(state, id, %{costo: result, agendado: false}, fn envio ->
+      Map.put(envio, :costo, result)
+    end)
+    {:reply, result, nuevo_estado}
   end
 
   @impl true
   def handle_call({:agendar_envio, id}, _from, state) do
-    result = Libremarket.Envios.agendar_envio(id)
-    {:reply, result, state}
+    nuevo_estado = Map.update(state, id, %{costo: 0, agendado: true}, fn envio ->
+      Map.put(envio, :agendado, true)
+    end)
+    {:reply, {:envio_agendado, id}, nuevo_estado}
   end
 
   @impl true
