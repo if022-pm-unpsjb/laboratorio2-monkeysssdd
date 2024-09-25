@@ -1,6 +1,6 @@
 defmodule Libremarket.Infracciones do
 
-  def reservar_producto(producto_id) do    
+  def reservar_producto(producto_id) do
     reservado = :rand.uniform(100) <= 50
 
     if reservado do
@@ -8,41 +8,41 @@ defmodule Libremarket.Infracciones do
     else
       false
     end
-    
+
   end
-  
-  def hubo_infraccion(producto_id) do
-  	infraccion = Enum.find(Libremarket.Infracciones.Server.listar_infracciones(), fn {id, _value} -> id == producto_id end)
-  	
-  	if reservar_producto and not infraccion do
-  		liberar_producto(producto_id)
-  	end
-	else do
-		pago_autorizado(producto_id)
-	end
-        
-  end
-  
+
+  # def hubo_infraccion(producto_id) do
+  # 	infraccion = Enum.find(Libremarket.Infracciones.Server.listar_infracciones(), fn {id, _value} -> id == producto_id end)
+
+  # 	if reservar_producto and not infraccion do
+  # 		liberar_producto(producto_id)
+  # 	end
+	# else do
+	# 	pago_autorizado(producto_id)
+	# end
+
+  # end
+
   def pago_autorizado(producto_id) do
   	se_autorizo_pago = Libremarket.Pagos.Server.autorizarPago(producto_id)
-  	
+
   	if se_autorizo_pago == {:pago_autorizado} do
       enviar_producto(producto_id)
     else
-      liberar_producto(producto_id)
+      # liberar_producto(producto_id)
     end
   end
-  
-  def liberar_producto(producto_id) do
-	producto_liberado = :rand.uniform(100) <= 30
 
-    if reservado do
-      true
-    else
-      false
-    end
-  end
-  
+  # def liberar_producto(producto_id) do
+	# producto_liberado = :rand.uniform(100) <= 30
+
+  #   if reservado do
+  #     true
+  #   else
+  #     false
+  #   end
+  # end
+
   def enviar_producto(producto_id) do
   	producto_id
   end
@@ -77,7 +77,7 @@ defmodule Libremarket.Ventas.Server do
   def liberar_producto(id \\ 0, pid \\ __MODULE__) do
     GenServer.call(pid, {:liberar_producto, id})
   end
-  
+
   def enviar_producto(id \\ 0, pid \\ __MODULE__) do
     GenServer.call(pid, {:enviar_producto, id})
   end
