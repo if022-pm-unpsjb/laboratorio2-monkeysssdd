@@ -1,17 +1,4 @@
 defmodule Libremarket.Envios do
-  def escribir_estado(estado) do
-    File.write("estado_envios.txt", estado)
-  end
-
-  def leer_estado() do
-    case File.read("estado_envios.txt") do
-      {:ok, contenido} ->
-        {:ok, contenido}
-      {:error, _} = error ->
-        error
-    end
-  end
-
   def calcular_costo() do
     :rand.uniform(1000)
   end
@@ -43,11 +30,11 @@ defmodule Libremarket.Envios.Server do
   end
 
   # Callbacks
-@impl true
-def init(_opts) do
-  Process.send_after(self(), :persistir_estado, 60_000)
-  {:ok, %{}}
-end
+  @impl true
+  def init(_opts) do
+    Process.send_after(self(), :persistir_estado, 60_000)
+    {:ok, %{}}
+  end
 
   @impl true
   def handle_call({:calcular_costo, id}, _from, state) do
@@ -72,11 +59,11 @@ end
   end
 
   @impl true
-def handle_info(:persistir_estado, state) do
-  estado_formateado = inspect(state)
-  Libremarket.Envios.escribir_estado(estado_formateado)
+  def handle_info(:persistir_estado, state) do
+    estado_formateado = inspect(state)
+    Libremarket.Persistencia.escribir_estado(estado_formateado, "envios")
 
-  Process.send_after(self(), :persistir_estado, 60_000)
-  {:noreply, state}
-end
+    Process.send_after(self(), :persistir_estado, 60_000)
+    {:noreply, state}
+  end
 end
