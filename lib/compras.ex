@@ -1,27 +1,24 @@
 defmodule Libremarket.Compras do
-
-  def comprar() do
-    {:show_me_the_money}
-  end
-
   def seleccionar_producto(id) do
     infraccion = Libremarket.Infracciones.Server.detectar_infracciones(id)
     reservado = true
-    #reservado = Libremarket.Ventas.Server.reservar_producto(id)
+    # reservado = Libremarket.Ventas.Server.reservar_producto(id)
     %{"producto" => %{"id" => id, "infraccion" => elem(infraccion, 0), "reservado" => reservado}}
   end
 
-  def seleccionar_forma_entrega() do
+  def seleccionar_forma_entrega(id_compra) do
     forma = :rand.uniform(100) <= 80
+
     if forma do
       forma = :correo
-      costo = Libremarket.Envios.Server.calcular_costo()
+      costo = Libremarket.Envios.Server.calcular_costo(id_compra)
       %{"forma_entrega" => forma, "costo_envio" => costo}
-      #seleccionar_medio_pago(id, costo, correo)
+      # seleccionar_medio_pago(id, costo, correo)
     else
       forma = :retira
-      costo = 0 # ?
-      #seleccionar_medio_pago(id, costo, correo)
+      # ?
+      costo = 0
+      # seleccionar_medio_pago(id, costo, correo)
       %{"forma_entrega" => forma, "costo_envio" => costo}
     end
   end
@@ -32,7 +29,6 @@ defmodule Libremarket.Compras do
     else
       %{"medio_de_pago" => :efectivo}
     end
-
   end
 
   def confirmar_compra(id, state) do
@@ -43,6 +39,7 @@ defmodule Libremarket.Compras do
       %{"estado" => :hay_infraccion}
     else
       pago_autorizado = elem(Libremarket.Pagos.Server.autorizarPago(id), 0)
+
       if pago_autorizado == :pago_rechazado do
         informar_pago_rechazado(id)
         %{"estado" => :pago_rechazado}
@@ -60,21 +57,20 @@ defmodule Libremarket.Compras do
   end
 
   def informar_confirmar_compra(id) do
-    IO.puts("Compra confirmada con éxito")
+    IO.puts("Compra " <> id <> " confirmada con éxito")
   end
 
   def finalizar_compra(id, costo) do
-    IO.puts("Compra finalizada con éxito")
+    IO.puts("Compra id " <> id <> "costo " <> costo <> " finalizada con éxito")
   end
 
   def informar_pago_rechazado(id) do
-    IO.puts("Pago rechazado")
+    IO.puts("Pago rechazado para la compra " <> id)
   end
 
   def informar_infraccion(id) do
-    IO.puts("Infracción detectada.")
+    IO.puts("Infracción detectada para la compra " <> id)
   end
-
 end
 
 defmodule Libremarket.Compras.Server do
@@ -93,14 +89,11 @@ defmodule Libremarket.Compras.Server do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  def comprar(pid \\ __MODULE__) do
-    GenServer.call(pid, :comprar)
-  end
-
   def generar_compra(id, pid \\ __MODULE__) do
     GenServer.call(pid, {:generar_compra, id})
   end
 
+  @spec seleccionar_producto(any(), any()) :: any()
   def seleccionar_producto(id_compra, id_producto, pid \\ __MODULE__) do
     GenServer.call(pid, {:seleccionar_producto, id_compra, id_producto})
   end
@@ -117,6 +110,10 @@ defmodule Libremarket.Compras.Server do
     GenServer.call(pid, {:confirmar_compra, id_compra})
   end
 
+  def listar_compras(pid \\ __MODULE__) do
+    GenServer.call(pid, :listar_compras)
+  end
+
   # Callbacks
 
   @doc """
@@ -126,7 +123,6 @@ defmodule Libremarket.Compras.Server do
   def init(state) do
     {:ok, state}
   end
-
 
   @impl true
   def handle_call({:generar_compra, id}, _from, state) do
@@ -145,7 +141,7 @@ defmodule Libremarket.Compras.Server do
 
   @impl true
   def handle_call({:seleccionar_forma_entrega, id}, _from, state) do
-    result = Libremarket.Compras.seleccionar_forma_entrega()
+    result = Libremarket.Compras.seleccionar_forma_entrega(id)
     actual_item_state = Map.get(state, id)
     new_item_state = Map.merge(actual_item_state, result)
     new_state = Map.put(state, id, new_item_state)
@@ -171,13 +167,8 @@ defmodule Libremarket.Compras.Server do
     {:reply, new_state, new_state}
   end
 
-  @doc """
-  Callback para un call :comprar
-  """
   @impl true
-  def handle_call(:comprar, _from, state) do
-    result = Libremarket.Compras.comprar
-    {:reply, result, state}
+  def handle_call(:listar_compras, _from, state) do
+    {:reply, state, state}
   end
-
 end
