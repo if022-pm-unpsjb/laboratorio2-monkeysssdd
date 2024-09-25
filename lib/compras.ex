@@ -1,8 +1,7 @@
 defmodule Libremarket.Compras do
   def seleccionar_producto(id) do
     infraccion = Libremarket.Infracciones.Server.detectar_infracciones(id)
-    reservado = true
-    # reservado = Libremarket.Ventas.Server.reservar_producto(id)
+    reservado = Libremarket.Ventas.Server.reservar_producto(id)
     %{"producto" => %{"id" => id, "infraccion" => elem(infraccion, 0), "reservado" => reservado}}
   end
 
