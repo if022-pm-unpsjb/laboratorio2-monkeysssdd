@@ -93,22 +93,12 @@ defmodule Libremarket.Ventas.Server do
   end
 
   @doc """
-  Callback para un call :comprar
+  Callback para un call :infracciones
   """
   @impl true
-  def handle_call({:detectar_infracciones, id}, _from, state) do
-    result = Libremarket.Infracciones.detectar_infracciones()
+  def handle_call({:reservar_producto, id}, _from, state) do
+    result = Libremarket.Ventas.reservar_producto(id)
     {:reply, result, [{id, result} | state]}
-  end
-
-  @impl true
-  def handle_call(:listar_infracciones, _from, state) do
-    {:reply, state, state}
-  end
-
-  @impl true
-  def handle_call({:inspeccionar, id}, _from, state) do
-    raise "error"
   end
 
 end
