@@ -57,19 +57,22 @@ defmodule Libremarket.Compras do
   end
 
   def informar_confirmar_compra(id) do
-    IO.puts("Compra " <> id <> " confirmada con éxito")
+    IO.puts("Compra " <> Integer.to_string(id) <> " confirmada con éxito")
   end
 
   def finalizar_compra(id, costo) do
-    IO.puts("Compra id " <> id <> "costo " <> costo <> " finalizada con éxito")
+    IO.puts(
+      "Compra id " <>
+        Integer.to_string(id) <> "costo " <> Integer.to_string(costo) <> " finalizada con éxito"
+    )
   end
 
   def informar_pago_rechazado(id) do
-    IO.puts("Pago rechazado para la compra " <> id)
+    IO.puts("Pago rechazado para la compra " <> Integer.to_string(id))
   end
 
   def informar_infraccion(id) do
-    IO.puts("Infracción detectada para la compra " <> id)
+    IO.puts("Infracción detectada para la compra " <> Integer.to_string(id))
   end
 end
 
