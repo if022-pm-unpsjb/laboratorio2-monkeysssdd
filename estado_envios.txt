@@ -1,0 +1,1 @@
+%{1 => %{costo: 377, agendado: true}, 2 => %{costo: 472, agendado: true}, 3 => %{costo: 754, agendado: false}, 4 => %{costo: 195, agendado: false}}
