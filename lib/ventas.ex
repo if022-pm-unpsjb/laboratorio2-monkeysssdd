@@ -1,4 +1,4 @@
-defmodule Libremarket.Infracciones do
+defmodule Libremarket.Ventas do
 
   def reservar_producto(producto_id) do    
     reservado = :rand.uniform(100) <= 50
@@ -14,10 +14,9 @@ defmodule Libremarket.Infracciones do
   def hubo_infraccion(producto_id) do
   	infraccion = Enum.find(Libremarket.Infracciones.Server.listar_infracciones(), fn {id, _value} -> id == producto_id end)
   	
-  	if reservar_producto and not infraccion do
+  	if reservar_producto(producto_id) and not infraccion do
   		liberar_producto(producto_id)
-  	end
-	else do
+	else 
 		pago_autorizado(producto_id)
 	end
         
@@ -36,7 +35,7 @@ defmodule Libremarket.Infracciones do
   def liberar_producto(producto_id) do
 	producto_liberado = :rand.uniform(100) <= 30
 
-    if reservado do
+    if producto_liberado do
       true
     else
       false
@@ -93,7 +92,7 @@ defmodule Libremarket.Ventas.Server do
   end
 
   @doc """
-  Callback para un call :infracciones
+  Callback para un call :ventas
   """
   @impl true
   def handle_call({:reservar_producto, id}, _from, state) do
