@@ -1,4 +1,4 @@
-defmodule Libremarket.Infracciones do
+defmodule Libremarket.Ventas do
 
   def reservar_producto(producto_id) do
     reservado = :rand.uniform(100) <= 50
@@ -88,8 +88,9 @@ defmodule Libremarket.Ventas.Server do
   Inicializa el estado del servidor
   """
   @impl true
-  def init(state) do
-    {:ok, state}
+  def init(_opts) do
+    Process.send_after(self(), :persistir_estado, 60_000)
+    {:ok, %{}}
   end
 
   @doc """
@@ -101,4 +102,12 @@ defmodule Libremarket.Ventas.Server do
     {:reply, result, [{id, result} | state]}
   end
 
+  @impl true
+  def handle_info(:persistir_estado, state) do
+    estado_formateado = inspect(state)
+    Libremarket.Persistencia.escribir_estado(estado_formateado, "ventas")
+
+    Process.send_after(self(), :persistir_estado, 60_000)
+    {:noreply, state}
+  end
 end

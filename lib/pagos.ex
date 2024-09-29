@@ -40,8 +40,9 @@ defmodule Libremarket.Pagos.Server do
   Inicializa el estado del servidor
   """
   @impl true
-  def init(state) do
-    {:ok, state}
+  def init(_opts) do
+    Process.send_after(self(), :persistir_estado, 60_000)
+    {:ok, %{}}
   end
 
   @doc """
@@ -51,5 +52,14 @@ defmodule Libremarket.Pagos.Server do
   def handle_call({:autorizarPago, id}, _from, state) do
     result = Libremarket.Pagos.autorizarPago(id)
     {:reply, result, [{id, result} | state]}
+  end
+
+  @impl true
+  def handle_info(:persistir_estado, state) do
+    estado_formateado = inspect(state)
+    Libremarket.Persistencia.escribir_estado(estado_formateado, "pagos")
+
+    Process.send_after(self(), :persistir_estado, 60_000)
+    {:noreply, state}
   end
 end
