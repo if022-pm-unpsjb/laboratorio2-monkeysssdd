@@ -124,8 +124,14 @@ defmodule Libremarket.Compras.Server do
   """
   @impl true
   def init(_opts) do
+    estado_inicial = case Libremarket.Persistencia.leer_estado("compras") do
+      {:ok, contenido} -> contenido
+      {:error, _} -> %{}
+    end
+
     Process.send_after(self(), :persistir_estado, 60_000)
-    {:ok, %{}}
+
+    {:ok, estado_inicial}
   end
 
 

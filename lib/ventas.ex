@@ -89,10 +89,15 @@ defmodule Libremarket.Ventas.Server do
   """
   @impl true
   def init(_opts) do
-    Process.send_after(self(), :persistir_estado, 60_000)
-    {:ok, %{}}
-  end
+    estado_inicial = case Libremarket.Persistencia.leer_estado("ventas") do
+      {:ok, contenido} -> contenido
+      {:error, _} -> %{}
+    end
 
+    Process.send_after(self(), :persistir_estado, 60_000)
+
+    {:ok, estado_inicial}
+  end
   @doc """
   Callback para un call :infracciones
   """
