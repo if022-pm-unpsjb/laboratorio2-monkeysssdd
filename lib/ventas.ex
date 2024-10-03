@@ -107,10 +107,16 @@ defmodule Libremarket.Ventas.Server do
   Inicializa el estado del servidor
   """
   @impl true
-  def init(state) do
-    {:ok, state}
-  end
+  def init(_opts) do
+    estado_inicial = case Libremarket.Persistencia.leer_estado("ventas") do
+      {:ok, contenido} -> contenido
+      {:error, _} -> %{}
+    end
 
+    Process.send_after(self(), :persistir_estado, 60_000)
+
+    {:ok, estado_inicial}
+  end
   @doc """
   Callback para un call :ventas
   """
@@ -120,4 +126,12 @@ defmodule Libremarket.Ventas.Server do
     {:reply, result, [{id, result} | state]}
   end
 
+  @impl true
+  def handle_info(:persistir_estado, state) do
+    estado_formateado = inspect(state)
+    Libremarket.Persistencia.escribir_estado(estado_formateado, "ventas")
+
+    Process.send_after(self(), :persistir_estado, 60_000)
+    {:noreply, state}
+  end
 end

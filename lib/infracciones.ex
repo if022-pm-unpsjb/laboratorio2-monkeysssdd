@@ -48,8 +48,15 @@ defmodule Libremarket.Infracciones.Server do
   Inicializa el estado del servidor
   """
   @impl true
-  def init(state) do
-    {:ok, state}
+  def init(_opts) do
+    estado_inicial = case Libremarket.Persistencia.leer_estado("infracciones") do
+      {:ok, contenido} -> contenido
+      {:error, _} -> %{}
+    end
+
+    Process.send_after(self(), :persistir_estado, 60_000)
+
+    {:ok, estado_inicial}
   end
 
   @doc """
@@ -71,4 +78,12 @@ defmodule Libremarket.Infracciones.Server do
     raise "error"
   end
 
+  @impl true
+  def handle_info(:persistir_estado, state) do
+    estado_formateado = inspect(state)
+    Libremarket.Persistencia.escribir_estado(estado_formateado, "infracciones")
+
+    Process.send_after(self(), :persistir_estado, 60_000)
+    {:noreply, state}
+  end
 end

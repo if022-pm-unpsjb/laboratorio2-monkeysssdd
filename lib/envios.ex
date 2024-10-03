@@ -30,10 +30,22 @@ defmodule Libremarket.Envios.Server do
   end
 
   # Callbacks
+  # @impl true
+  # def init(_opts) do
+  #   Process.send_after(self(), :persistir_estado, 60_000)
+  #   {:ok, %{}}
+  # end
 
   @impl true
   def init(_opts) do
-    {:ok, %{}}
+    estado_inicial = case Libremarket.Persistencia.leer_estado("envios") do
+      {:ok, contenido} -> contenido
+      {:error, _} -> %{}
+    end
+
+    Process.send_after(self(), :persistir_estado, 60_000)
+
+    {:ok, estado_inicial}
   end
 
   @impl true
@@ -56,5 +68,14 @@ defmodule Libremarket.Envios.Server do
   @impl true
   def handle_call(:listar_envios, _from, state) do
     {:reply, state, state}
+  end
+
+  @impl true
+  def handle_info(:persistir_estado, state) do
+    estado_formateado = inspect(state)
+    Libremarket.Persistencia.escribir_estado(estado_formateado, "envios")
+
+    Process.send_after(self(), :persistir_estado, 60_000)
+    {:noreply, state}
   end
 end
