@@ -1,0 +1,1 @@
+[{458, {:no_hay_infraccion}}, {101, {:hay_infraccion}}, {596, {:no_hay_infraccion}}, {506, {:no_hay_infraccion}}, {494, {:no_hay_infraccion}}, {864, {:no_hay_infraccion}}, {366, {:hay_infraccion}}, {204, {:no_hay_infraccion}}, {381, {:no_hay_infraccion}}, {149, {:hay_infraccion}} | %{}]
