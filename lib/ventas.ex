@@ -11,19 +11,6 @@ defmodule Libremarket.Ventas do
 
   end
 
-  # def hubo_infraccion(producto_id) do
-  # 	infraccion = Enum.find(Libremarket.Infracciones.Server.listar_infracciones(), fn {id, _value} -> id == producto_id end)
-
-  # 	if reservar_producto and not infraccion do
-  # 		liberar_producto(producto_id)
-  # 	end
-	# else do
-	# 	pago_autorizado(producto_id)
-	# end
-
-  # end
-
-
   def hubo_infraccion(producto_id) do
   	infraccion = Enum.find(Libremarket.Infracciones.Server.listar_infracciones(), fn {id, _value} -> id == producto_id end)
 
@@ -41,19 +28,12 @@ defmodule Libremarket.Ventas do
   	if se_autorizo_pago == {:pago_autorizado} do
       enviar_producto(producto_id)
     else
-      # liberar_producto(producto_id)
+      liberar_producto(producto_id)
     end
   end
 
-  # def liberar_producto(producto_id) do
-	# producto_liberado = :rand.uniform(100) <= 30
-
-  #   if reservado do
-  #     true
-  #   else
-  #     false
-  #   end
-  # end
+  def liberar_producto(producto_id) do
+	producto_liberado = :rand.uniform(100) <= 30
 
     if producto_liberado do
       true
@@ -107,16 +87,10 @@ defmodule Libremarket.Ventas.Server do
   Inicializa el estado del servidor
   """
   @impl true
-  def init(_opts) do
-    estado_inicial = case Libremarket.Persistencia.leer_estado("ventas") do
-      {:ok, contenido} -> contenido
-      {:error, _} -> %{}
-    end
-
-    Process.send_after(self(), :persistir_estado, 60_000)
-
-    {:ok, estado_inicial}
+  def init(state) do
+    {:ok, state}
   end
+
   @doc """
   Callback para un call :ventas
   """
