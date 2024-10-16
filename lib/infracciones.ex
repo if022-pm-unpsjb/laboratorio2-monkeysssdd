@@ -1,5 +1,4 @@
 defmodule Libremarket.Infracciones do
-
   def detectar_infracciones() do
     infraccion = :rand.uniform(100) <= 30
 
@@ -8,10 +7,7 @@ defmodule Libremarket.Infracciones do
     else
       {:no_hay_infraccion}
     end
-
   end
-
-
 end
 
 defmodule Libremarket.Infracciones.Server do
@@ -27,19 +23,19 @@ defmodule Libremarket.Infracciones.Server do
   Crea un nuevo servidor de Infracciones
   """
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: {:global,__MODULE__})
+    GenServer.start_link(__MODULE__, opts, name: {:global, __MODULE__})
   end
 
   def detectar_infracciones(id \\ 0, pid \\ __MODULE__) do
-    GenServer.call({:global, Libremarket.Infracciones.Server}, {:detectar_infracciones, id})
+    GenServer.call({:global, __MODULE__}, {:detectar_infracciones, id})
   end
 
   def listar_infracciones(pid \\ __MODULE__) do
-    GenServer.call({:global, Libremarket.Infracciones.Server}, :listar_infracciones)
+    GenServer.call({:global, __MODULE__}, :listar_infracciones)
   end
 
   def inspeccionar(id \\ 0, pid \\ __MODULE__) do
-    GenServer.call({:global, Libremarket.Infracciones.Server}, {:inspeccionar, id})
+    GenServer.call({:global, __MODULE__}, {:inspeccionar, id})
   end
 
   # Callbacks
@@ -49,10 +45,11 @@ defmodule Libremarket.Infracciones.Server do
   """
   @impl true
   def init(_opts) do
-    estado_inicial = case Libremarket.Persistencia.leer_estado("infracciones") do
-      {:ok, contenido} -> contenido
-      {:error, _} -> %{}
-    end
+    estado_inicial =
+      case Libremarket.Persistencia.leer_estado("infracciones") do
+        {:ok, contenido} -> contenido
+        {:error, _} -> %{}
+      end
 
     Process.send_after(self(), :persistir_estado, 60_000)
 

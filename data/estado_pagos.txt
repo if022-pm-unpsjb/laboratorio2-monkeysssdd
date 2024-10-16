@@ -1,1 +1,1 @@
-[{9, {:pago_autorizado}}, {7, {:pago_autorizado}}, {6, {:pago_autorizado}}, {5, {:pago_autorizado}}, {4, {:pago_rechazado}}, {2, {:pago_autorizado}}, {1, {:pago_autorizado}} | %{}]
+[{0, {:pago_autorizado}} | %{}]

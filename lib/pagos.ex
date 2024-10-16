@@ -1,5 +1,4 @@
 defmodule Libremarket.Pagos do
-
   def autorizarPago(id) do
     pago = :rand.uniform(100) <= 70
 
@@ -8,10 +7,7 @@ defmodule Libremarket.Pagos do
     else
       {:pago_rechazado}
     end
-
   end
-
-
 end
 
 defmodule Libremarket.Pagos.Server do
@@ -27,11 +23,11 @@ defmodule Libremarket.Pagos.Server do
   Crea un nuevo servidor de Infracciones
   """
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: {:global, __MODULE__})
   end
 
   def autorizarPago(id \\ 0, pid \\ __MODULE__) do
-    GenServer.call(pid, {:autorizarPago, id})
+    GenServer.call({:global, __MODULE__}, {:autorizarPago, id})
   end
 
   # Callbacks
@@ -41,10 +37,11 @@ defmodule Libremarket.Pagos.Server do
   """
   @impl true
   def init(_opts) do
-    estado_inicial = case Libremarket.Persistencia.leer_estado("pagos") do
-      {:ok, contenido} -> contenido
-      {:error, _} -> %{}
-    end
+    estado_inicial =
+      case Libremarket.Persistencia.leer_estado("pagos") do
+        {:ok, contenido} -> contenido
+        {:error, _} -> %{}
+      end
 
     Process.send_after(self(), :persistir_estado, 60_000)
 
