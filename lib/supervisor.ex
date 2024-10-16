@@ -11,11 +11,11 @@ defmodule Libremarket.Supervisor do
   @impl true
   def init(_opts) do
     children = [
-      Libremarket.Compras.Server,
+      # Libremarket.Compras.Server,
       Libremarket.Infracciones.Server,
-      Libremarket.Envios.Server,
-      Libremarket.Pagos.Server,
-      Libremarket.Ventas.Server
+      # Libremarket.Envios.Server,
+      # Libremarket.Pagos.Server,
+      # Libremarket.Ventas.Server
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
