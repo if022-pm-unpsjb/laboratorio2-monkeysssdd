@@ -123,15 +123,23 @@ defmodule Libremarket.Compras.Server do
   """
   @impl true
   def init(_opts) do
-    estado_inicial =
-      case Libremarket.Persistencia.leer_estado("compras") do
-        {:ok, contenido} -> contenido
-        {:error, _} -> %{}
-      end
+    case Libremarket.Persistencia.leer_estado("compras") do
+      {:ok, contenido} ->
+        Process.send_after(self(), :persistir_estado, 60_000)
+        {:ok, contenido}
 
-    Process.send_after(self(), :persistir_estado, 60_000)
+      {:error, _} ->
+        estado_inicial = %{}  # Estado por defecto si no se puede leer el estado
+        Process.send_after(self(), :persistir_estado, 60_000)
+        {:ok, estado_inicial}
 
-    {:ok, estado_inicial}
+      :ok ->
+        # Manejo explícito si por alguna razón obtienes :ok en lugar de {:ok, contenido}
+        IO.puts("Advertencia: se obtuvo :ok sin contenido en leer_estado")
+        estado_inicial = %{}
+        Process.send_after(self(), :persistir_estado, 60_000)
+        {:ok, estado_inicial}
+    end
   end
 
   @impl true
@@ -184,8 +192,7 @@ defmodule Libremarket.Compras.Server do
 
   @impl true
   def handle_info(:persistir_estado, state) do
-    estado_formateado = inspect(state)
-    Libremarket.Persistencia.escribir_estado(estado_formateado, "compras")
+    Libremarket.Persistencia.escribir_estado(state, "compras")
 
     Process.send_after(self(), :persistir_estado, 60_000)
     {:noreply, state}

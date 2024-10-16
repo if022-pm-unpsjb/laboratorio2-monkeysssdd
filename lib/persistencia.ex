@@ -1,20 +1,53 @@
 defmodule Libremarket.Persistencia do
-  def escribir_estado(estado, nombre_servidor) do
-    File.write("data/estado_#{nombre_servidor}.txt", estado)
+  @dets_file "../data/estado_compras.dets"
+  @dets_file "../data/estado_envios.dets"
+  @dets_file "../data/estado_infracciones.dets"
+  @dets_file "../data/estado_pagos.dets"
+  @dets_file "../data/estado_ventas.dets"
+
+
+  defp ensure_data_dir do
+    unless File.exists?("data") do
+      File.mkdir("data")
+    end
   end
 
-  #esto es porque sino lee el archivo todo como string y no como un map y se rompe
+  def abrir_dets(nombre_servidor) do
+    ensure_data_dir()
+    :dets.open_file(String.to_atom("./data/"<>nombre_servidor<>".dets"), [type: :set])
+  end
+
+  def cerrar_dets(dets_ref) do
+    :dets.close(dets_ref)
+  end
+
+  def escribir_estado(estado, nombre_servidor) do
+    # IO.puts("hola")
+    # IO.puts(abrir_dets(nombre_servidor))
+    case abrir_dets(nombre_servidor) do
+      {:ok, dets_ref} ->
+        :dets.insert(dets_ref, {nombre_servidor, estado})
+        cerrar_dets(dets_ref)
+
+      {:error, reason} ->
+        IO.puts("Error al abrir archivo DETS: #{inspect(reason)}")
+    end
+  end
+
   def leer_estado(nombre_servidor) do
-    case File.read("data/estado_#{nombre_servidor}.txt") do
-      {:ok, contenido} when contenido != "" ->
-        {estado, _bindings} = Code.eval_string(contenido)
-        {:ok, estado}
+    case abrir_dets(nombre_servidor) do
+      {:ok, dets_ref} ->
+        case :dets.lookup(dets_ref, nombre_servidor) do
+          [{_nombre, estado}] -> state = {:ok, estado}
+          [] -> state = {:error, :no_data}
+          cerrar_dets(dets_ref)
+          state
+        end
 
-      {:ok, _} ->
-        {:error, :empty_file}
 
-      {:error, _} = error ->
-        error
+      {:error, reason} ->
+        IO.puts("Error al abrir archivo DETS: #{inspect(reason)}")
+        {:error, reason}
     end
   end
 end

@@ -84,10 +84,26 @@ defmodule Libremarket.Ventas.Server do
   @doc """
   Inicializa el estado del servidor
   """
-  @impl true
-  def init(state) do
-    {:ok, state}
+@impl true
+def init(_opts) do
+  case Libremarket.Persistencia.leer_estado("ventas") do
+    {:ok, contenido} ->
+      Process.send_after(self(), :persistir_estado, 60_000)
+      {:ok, contenido}
+
+    {:error, _} ->
+      estado_inicial = %{}  # Estado por defecto si no se puede leer el estado
+      Process.send_after(self(), :persistir_estado, 60_000)
+      {:ok, estado_inicial}
+
+    :ok ->
+      # Manejo explícito si por alguna razón obtienes :ok en lugar de {:ok, contenido}
+      IO.puts("Advertencia: se obtuvo :ok sin contenido en leer_estado")
+      estado_inicial = %{}
+      Process.send_after(self(), :persistir_estado, 60_000)
+      {:ok, estado_inicial}
   end
+end
 
   @doc """
   Callback para un call :ventas
@@ -100,8 +116,7 @@ defmodule Libremarket.Ventas.Server do
 
   @impl true
   def handle_info(:persistir_estado, state) do
-    estado_formateado = inspect(state)
-    Libremarket.Persistencia.escribir_estado(estado_formateado, "ventas")
+    Libremarket.Persistencia.escribir_estado(state, "ventas")
 
     Process.send_after(self(), :persistir_estado, 60_000)
     {:noreply, state}
