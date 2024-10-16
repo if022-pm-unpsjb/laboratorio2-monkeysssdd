@@ -88,32 +88,32 @@ defmodule Libremarket.Compras.Server do
   Crea un nuevo servidor de Compras
   """
   def start_link(opts \\ %{}) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+    GenServer.start_link(__MODULE__, %{}, name: {:global, __MODULE__})
   end
 
   def generar_compra(id, pid \\ __MODULE__) do
-    GenServer.call(pid, {:generar_compra, id})
+    GenServer.call({:global, __MODULE__}, {:generar_compra, id})
   end
 
   @spec seleccionar_producto(any(), any()) :: any()
   def seleccionar_producto(id_compra, id_producto, pid \\ __MODULE__) do
-    GenServer.call(pid, {:seleccionar_producto, id_compra, id_producto})
+    GenServer.call({:global, __MODULE__}, {:seleccionar_producto, id_compra, id_producto})
   end
 
   def seleccionar_forma_entrega(id_compra, pid \\ __MODULE__) do
-    GenServer.call(pid, {:seleccionar_forma_entrega, id_compra})
+    GenServer.call({:global, __MODULE__}, {:seleccionar_forma_entrega, id_compra})
   end
 
   def seleccionar_medio_pago(id_compra, pid \\ __MODULE__) do
-    GenServer.call(pid, {:seleccionar_medio_pago, id_compra})
+    GenServer.call({:global, __MODULE__}, {:seleccionar_medio_pago, id_compra})
   end
 
   def confirmar_compra(id_compra, pid \\ __MODULE__) do
-    GenServer.call(pid, {:confirmar_compra, id_compra})
+    GenServer.call({:global, __MODULE__}, {:confirmar_compra, id_compra})
   end
 
   def listar_compras(pid \\ __MODULE__) do
-    GenServer.call(pid, :listar_compras)
+    GenServer.call({:global, __MODULE__}, :listar_compras)
   end
 
   # Callbacks
@@ -123,10 +123,11 @@ defmodule Libremarket.Compras.Server do
   """
   @impl true
   def init(_opts) do
-    estado_inicial = case Libremarket.Persistencia.leer_estado("compras") do
-      {:ok, contenido} -> contenido
-      {:error, _} -> %{}
-    end
+    estado_inicial =
+      case Libremarket.Persistencia.leer_estado("compras") do
+        {:ok, contenido} -> contenido
+        {:error, _} -> %{}
+      end
 
     Process.send_after(self(), :persistir_estado, 60_000)
 
@@ -189,5 +190,4 @@ defmodule Libremarket.Compras.Server do
     Process.send_after(self(), :persistir_estado, 60_000)
     {:noreply, state}
   end
-
 end

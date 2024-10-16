@@ -14,19 +14,19 @@ defmodule Libremarket.Envios.Server do
   # API del cliente
 
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: {:global, __MODULE__})
   end
 
   def calcular_costo(id, pid \\ __MODULE__) do
-    GenServer.call(pid, {:calcular_costo, id})
+    GenServer.call({:global, __MODULE__}, {:calcular_costo, id})
   end
 
   def listar_envios(pid \\ __MODULE__) do
-    GenServer.call(pid, :listar_envios)
+    GenServer.call({:global, __MODULE__}, :listar_envios)
   end
 
   def agendar_envio(id, pid \\ __MODULE__) do
-    GenServer.call(pid, {:agendar_envio, id})
+    GenServer.call({:global, __MODULE__}, {:agendar_envio, id})
   end
 
   # Callbacks
@@ -38,10 +38,11 @@ defmodule Libremarket.Envios.Server do
 
   @impl true
   def init(_opts) do
-    estado_inicial = case Libremarket.Persistencia.leer_estado("envios") do
-      {:ok, contenido} -> contenido
-      {:error, _} -> %{}
-    end
+    estado_inicial =
+      case Libremarket.Persistencia.leer_estado("envios") do
+        {:ok, contenido} -> contenido
+        {:error, _} -> %{}
+      end
 
     Process.send_after(self(), :persistir_estado, 60_000)
 
@@ -51,17 +52,22 @@ defmodule Libremarket.Envios.Server do
   @impl true
   def handle_call({:calcular_costo, id}, _from, state) do
     result = Libremarket.Envios.calcular_costo()
-    nuevo_estado = Map.update(state, id, %{costo: result, agendado: false}, fn envio ->
-      Map.put(envio, :costo, result)
-    end)
+
+    nuevo_estado =
+      Map.update(state, id, %{costo: result, agendado: false}, fn envio ->
+        Map.put(envio, :costo, result)
+      end)
+
     {:reply, result, nuevo_estado}
   end
 
   @impl true
   def handle_call({:agendar_envio, id}, _from, state) do
-    nuevo_estado = Map.update(state, id, %{costo: 0, agendado: true}, fn envio ->
-      Map.put(envio, :agendado, true)
-    end)
+    nuevo_estado =
+      Map.update(state, id, %{costo: 0, agendado: true}, fn envio ->
+        Map.put(envio, :agendado, true)
+      end)
+
     {:reply, {:envio_agendado, id}, nuevo_estado}
   end
 
