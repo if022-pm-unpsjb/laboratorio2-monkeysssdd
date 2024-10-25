@@ -22,6 +22,10 @@ defmodule Libremarket.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:amqp, "~> 3.3"},
+      {:amqp_client, "~> 3.12"},
+      {:rabbit_common, "~> 3.13.4", override: true},
+      {:libcluster, "~> 3.4"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

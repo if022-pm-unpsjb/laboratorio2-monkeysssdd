@@ -1,8 +1,10 @@
 defmodule Libremarket.Compras do
   def seleccionar_producto(id) do
-    infraccion = Libremarket.Infracciones.Server.detectar_infracciones(id)
+    #infraccion = Libremarket.Infracciones.Server.detectar_infracciones(id)
+    Libremarket.Compras.MessageServer.send_message("{:detectar_infracciones, #{id}}")
+    infraccion = Libremarket.Compras.MessageServer.receive_message()
     reservado = Libremarket.Ventas.Server.reservar_producto(id)
-    %{"producto" => %{"id" => id, "infraccion" => elem(infraccion, 0), "reservado" => reservado}}
+    %{"producto" => %{"id" => id, "infraccion" => infraccion, "reservado" => reservado}}
   end
 
   def seleccionar_forma_entrega(id_compra) do
@@ -75,13 +77,89 @@ defmodule Libremarket.Compras do
   end
 end
 
+defmodule Libremarket.Compras.MessageServer do
+  use GenServer
+  use AMQP
+
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: {:global, __MODULE__})
+end
+
+  def send_message(message) do
+    {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
+    {:ok, channel} = Channel.open(connection)
+
+    # Declarar una cola y un exchange
+    queue_name = "infracciones_queue"
+    exchange_name = "libremarket_exchange"
+
+    Queue.declare(channel, queue_name, durable: true)
+    Exchange.declare(channel, exchange_name, :direct, durable: true)
+
+    # Enlazar la cola con el exchange
+    Queue.bind(channel, queue_name, exchange_name)
+
+    # Publicar el mensaje
+    Basic.publish(channel, exchange_name, "", message)
+
+    IO.puts("Mensaje enviado: #{message}")
+
+    # Cerrar conexión
+    Channel.close(channel)
+    Connection.close(connection)
+  end
+
+  defp receive_messages(channel) do
+    receive do
+      {:basic_deliver, payload, _meta} ->
+        receive_messages(channel)
+    end
+  end
+
+  def receive_message() do
+    {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
+    {:ok, channel} = Channel.open(connection)
+
+    # Declarar la cola
+    queue_name = "compras_queue"
+    Queue.declare(channel, queue_name, durable: true)
+
+    # Configurar el consumidor
+    Basic.consume(channel, queue_name, nil, no_ack: true)
+
+    # Recibir el mensaje de compras_queue
+    res = receive do
+      {:basic_deliver, payload, _meta} ->
+        IO.puts("Mensaje recibido en compras_queue: #{payload}")
+        {eval_payload, _bindings} = Code.eval_string(payload)
+        eval_payload  # Retornar el payload evaluado
+    end
+
+    # Cerrar canal y conexión
+    Channel.close(channel)
+    Connection.close(connection)
+
+    res
+  end
+
+  @impl true
+  def handle_info({:basic_consume_ok, _consumer_tag}, state) do
+    # Se ignora este mensaje ya que es solo una confirmación
+    {:noreply, state}
+  end
+
+  def handle_info(_, state) do
+    {:noreply, state}
+  end
+
+end
+
 defmodule Libremarket.Compras.Server do
   @moduledoc """
   Compras
   """
 
   use GenServer
-
   # API del cliente
 
   @doc """
@@ -140,6 +218,7 @@ defmodule Libremarket.Compras.Server do
         Process.send_after(self(), :persistir_estado, 60_000)
         {:ok, estado_inicial}
     end
+
   end
 
   @impl true
@@ -195,6 +274,10 @@ defmodule Libremarket.Compras.Server do
     Libremarket.Persistencia.escribir_estado(state, "compras")
 
     Process.send_after(self(), :persistir_estado, 60_000)
+    {:noreply, state}
+  end
+
+  def handle_info(_, state) do
     {:noreply, state}
   end
 end
