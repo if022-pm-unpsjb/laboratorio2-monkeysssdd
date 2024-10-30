@@ -89,25 +89,26 @@ end
     {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
     {:ok, channel} = Channel.open(connection)
 
-    # Declarar una cola y un exchange
+    # Declarar la cola y el intercambio con una clave de enrutamiento específica
     queue_name = "infracciones_queue"
     exchange_name = "libremarket_exchange"
 
     Queue.declare(channel, queue_name, durable: true)
     Exchange.declare(channel, exchange_name, :direct, durable: true)
 
-    # Enlazar la cola con el exchange
-    Queue.bind(channel, queue_name, exchange_name)
+    # Usar una clave de enrutamiento específica para infracciones
+    routing_key = "infracciones_key"
+    Queue.bind(channel, queue_name, exchange_name, routing_key: routing_key)
 
-    # Publicar el mensaje
-    Basic.publish(channel, exchange_name, "", message)
+    # Publicar el mensaje con la clave de enrutamiento
+    Basic.publish(channel, exchange_name, routing_key, message)
 
     IO.puts("Mensaje enviado: #{message}")
 
-    # Cerrar conexión
     Channel.close(channel)
     Connection.close(connection)
   end
+
 
   defp receive_messages(channel) do
     receive do
