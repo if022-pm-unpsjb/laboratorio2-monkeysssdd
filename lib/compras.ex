@@ -131,7 +131,7 @@ end
     # Recibir el mensaje de compras_queue
     res = receive do
       {:basic_deliver, payload, _meta} ->
-        IO.puts("Mensaje recibido en compras_queue: #{payload}")
+        # IO.puts("Mensaje recibido en compras_queue: #{payload}")
         {eval_payload, _bindings} = Code.eval_string(payload)
         eval_payload  # Retornar el payload evaluado
     end
