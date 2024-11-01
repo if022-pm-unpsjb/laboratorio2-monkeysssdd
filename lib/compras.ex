@@ -2,9 +2,9 @@ defmodule Libremarket.Compras do
   def seleccionar_producto(id) do
     #infraccion = Libremarket.Infracciones.Server.detectar_infracciones(id)
     Libremarket.Compras.MessageServer.send_message("{:detectar_infracciones, #{id}}")
-    infraccion = Libremarket.Compras.MessageServer.receive_message()
+    #infraccion = Libremarket.Compras.MessageServer.receive_message()
     reservado = Libremarket.Ventas.Server.reservar_producto(id)
-    %{"producto" => %{"id" => id, "infraccion" => infraccion, "reservado" => reservado}}
+    %{"producto" => %{"id" => id, "infraccion" => nil, "reservado" => reservado}}
   end
 
   def seleccionar_forma_entrega(id_compra) do
@@ -81,17 +81,40 @@ defmodule Libremarket.Compras.MessageServer do
   use GenServer
   use AMQP
 
+  @impl true
+  def init(_opts) do
+    spawn(fn -> start()end)
+    {:ok, %{}}
+  end
+
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: {:global, __MODULE__})
-end
+  end
+
+  def start do
+    # Conectar al servidor RabbitMQ
+    {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
+    {:ok, channel} = Channel.open(connection)
+
+    # Declarar una cola
+    queue_name = "test_queue"
+    Queue.declare(channel, queue_name, durable: true)
+
+    # Configurar el consumidor
+    Basic.consume(channel, queue_name, nil, no_ack: true)
+
+    # Iniciar el loop para recibir mensajes
+    receive_messages(channel)
+  end
 
   def send_message(message) do
+    IO.puts("ENVIANDO A INFRACCIONES")
     {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
     {:ok, channel} = Channel.open(connection)
 
     # Declarar una cola y un exchange
-    queue_name = "infracciones_queue"
-    exchange_name = "libremarket_exchange"
+    queue_name = "test_queue"
+    exchange_name = "test_exchange"
 
     Queue.declare(channel, queue_name, durable: true)
     Exchange.declare(channel, exchange_name, :direct, durable: true)
@@ -110,8 +133,10 @@ end
   end
 
   defp receive_messages(channel) do
+    IO.puts("ESPERANDO EN COMPRAS")
     receive do
       {:basic_deliver, payload, _meta} ->
+        IO.puts("RECIBIDO EN COMPRAS #{payload}")
         receive_messages(channel)
     end
   end
@@ -127,6 +152,7 @@ end
     # Configurar el consumidor
     Basic.consume(channel, queue_name, nil, no_ack: true)
 
+    IO.puts("compras receive message")
     # Recibir el mensaje de compras_queue
     res = receive do
       {:basic_deliver, payload, _meta} ->
