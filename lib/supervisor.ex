@@ -22,6 +22,7 @@ defmodule Libremarket.Supervisor do
         ]
       ]
     ]
+
     children = [
       Libremarket.Compras.Server,
       Libremarket.Infracciones.Server,
