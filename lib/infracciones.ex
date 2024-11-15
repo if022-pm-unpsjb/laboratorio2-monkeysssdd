@@ -70,26 +70,14 @@ defmodule Libremarket.Infracciones.MessageServer do
     {:noreply, state}
   end
 
-  def send_message(message) do
-    {:ok, connection} =
-      Connection.open(
-        "amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej",
-        ssl_options: [verify: :verify_none]
-      )
-
-    {:ok, channel} = Channel.open(connection)
-
-    # Declarar una cola y un exchange
-    queue_name = "new_compras_queue"
+  @impl true
+  def handle_cast({:send_message, server_name, message}, channel) do
+    queue_name = "new_" <> server_name <> "_queue"
     exchange_name = ""
-
     Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
-    IO.puts("Mensaje enviado: #{inspect(message)}")
-
-    # Cerrar conexión
-    Channel.close(channel)
-    Connection.close(connection)
+    IO.puts("Mensaje enviado desde infracciones: #{inspect(message)}")
+    {:noreply, channel}
   end
 end
 
@@ -156,9 +144,14 @@ defmodule Libremarket.Infracciones.Server do
   def handle_call({:detectar_infracciones, id_compra, id_producto}, _from, state) do
     result = Libremarket.Infracciones.detectar_infracciones()
 
-    Libremarket.Infracciones.MessageServer.send_message(
-      {:actualizar_infracciones, id_compra, result}
+    GenServer.cast(
+      {:global, Libremarket.Infracciones.MessageServer},
+      {:send_message, "compras", {:actualizar_infracciones, id_compra, result}}
     )
+
+    # Libremarket.Infracciones.MessageServer.send_message(
+    #  {:actualizar_infracciones, id_compra, result}
+    # )
 
     {:reply, result, [{id_producto, result} | state]}
   end
@@ -167,7 +160,14 @@ defmodule Libremarket.Infracciones.Server do
   def handle_call({:detectar_infracciones, id}, _from, state) do
     result = Libremarket.Infracciones.detectar_infracciones()
     IO.puts("MANDADO")
-    Libremarket.Infracciones.MessageServer.send_message({:actualizar_infracciones, id, result})
+
+    GenServer.cast(
+      {:global, Libremarket.Infracciones.MessageServer},
+      {:send_message, "compras", {:actualizar_infracciones, id, result}}
+    )
+
+    # Libremarket.Infracciones.MessageServer.send_message({:actualizar_infracciones, id, result})
+
     {:reply, result, [{id, result} | state]}
   end
 

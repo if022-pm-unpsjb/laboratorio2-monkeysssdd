@@ -1,7 +1,13 @@
 defmodule Libremarket.Compras do
   def seleccionar_producto(id_compra, id) do
     # infraccion = Libremarket.Infracciones.Server.detectar_infracciones(id)
-    Libremarket.Compras.MessageServer.send_message({:detectar_infracciones, id_compra, id})
+    # Libremarket.Compras.MessageServer.send_message({:detectar_infracciones, id_compra, id})
+
+    GenServer.cast(
+      {:global, Libremarket.Compras.MessageServer},
+      {:send_message, "infracciones", {:detectar_infracciones, id_compra, id}}
+    )
+
     # infraccion = Libremarket.Compras.MessageServer.receive_message()
     reservado = Libremarket.Ventas.Server.reservar_producto(id)
     %{"producto" => %{"id" => id, "infraccion" => nil, "reservado" => reservado}}
@@ -33,7 +39,7 @@ defmodule Libremarket.Compras do
   end
 
   def confirmar_compra(id, state) do
-    hay_infraccion = Map.get(Map.get(state, "producto"), "infraccion") == :hay_infraccion
+    hay_infraccion = Map.get(Map.get(state, "producto"), "new_infracciones") == :hay_infraccion
 
     if hay_infraccion do
       informar_infraccion(id)
@@ -105,26 +111,14 @@ defmodule Libremarket.Compras.MessageServer do
     GenServer.start_link(__MODULE__, opts, name: {:global, __MODULE__})
   end
 
-  def send_message(message) do
-    IO.puts("ENVIANDO A INFRACCIONES")
-
-    {:ok, connection} =
-      Connection.open(
-        "amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej",
-        ssl_options: [verify: :verify_none]
-      )
-
-    {:ok, channel} = Channel.open(connection)
-
-    # Declarar una cola y un exchange
-    queue_name = "new_infracciones_queue"
+  @impl true
+  def handle_cast({:send_message, server_name, message}, channel) do
+    queue_name = "new_" <> server_name <> "_queue"
     exchange_name = ""
     Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
     IO.puts("Mensaje enviado desde compras: #{inspect(message)}")
-
-    Channel.close(channel)
-    Connection.close(connection)
+    {:noreply, channel}
   end
 
   def handle_info({:basic_deliver, payload, _meta}, state) do
