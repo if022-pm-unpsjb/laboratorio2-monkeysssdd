@@ -11,14 +11,13 @@ defmodule Libremarket.Infracciones do
 end
 
 defmodule Libremarket.Infracciones.MessageServer do
-  #use GenServer
+  # use GenServer
   use AMQP
   use GenServer
 
   @impl true
   def init(_opts) do
-    spawn(fn -> start()end)
-    {:ok, %{}}
+    {:ok, start()}
   end
 
   def start_link(opts \\ []) do
@@ -27,69 +26,59 @@ defmodule Libremarket.Infracciones.MessageServer do
 
   def start do
     # Conectar al servidor RabbitMQ
-    {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
+    {:ok, connection} =
+      Connection.open(
+        "amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej",
+        ssl_options: [verify: :verify_none]
+      )
+
     {:ok, channel} = Channel.open(connection)
 
     # Declarar una cola
-    queue_name = "test_queue"
-    Queue.declare(channel, queue_name, durable: true)
+    queue_name = "new_infracciones_queue"
+    Queue.declare(channel, queue_name, durable: false)
 
     # Configurar el consumidor
     Basic.consume(channel, queue_name, nil, no_ack: true)
 
+    channel
     # Iniciar el loop para recibir mensajes
-    receive_messages(channel)
+    # receive_messages(channel)
   end
 
-  defp receive_messages(channel) do
-    IO.puts("ESPERANDO MENSAJES EN INFRACCIONES")
-    receive do
-      {:basic_deliver, payload, _meta} ->
-        {eval_payload, _bindings} = Code.eval_string(payload)
+  def handle_info({:basic_deliver, payload, _meta}, state) do
+    # Evalúa el payload recibido
+    eval_payload = :erlang.binary_to_term(payload)
 
-        case eval_payload do
-          {:detectar_infracciones, id} ->
-            # Realiza la llamada a detectar infracciones
-            GenServer.call({:global, Libremarket.Infracciones.Server}, {:detectar_infracciones, id})
-          _ ->
-            IO.puts("Payload recibido: #{payload}")
-        end
-        IO.puts("Mensaje recibido EN INFRACCIONES: #{payload}")
-        receive_messages(channel)
+    case eval_payload do
+      {:detectar_infracciones, id_compra, id_producto} ->
+        # Realiza la llamada a detectar infracciones
+        GenServer.call(
+          {:global, Libremarket.Infracciones.Server},
+          {:detectar_infracciones, id_compra, id_producto}
+        )
     end
+
+    IO.puts("Mensaje recibido en infracciones: #{inspect(:erlang.binary_to_term(payload))}")
+    {:noreply, state}
   end
 
   @impl true
   def handle_info({:basic_consume_ok, _meta}, state) do
-    IO.puts("RECIBI HANDLEINFO EN INFRACCIONES")
+    IO.puts("RECIBIDO EN INFRACCIONES BASIC_CONSUME")
     # Ignorar el mensaje de confirmación de consumo
     {:noreply, state}
   end
 
-  def send_message(message) do
-    {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
-    {:ok, channel} = Channel.open(connection)
+  @impl true
+  def handle_cast({:send_message, server_name, message}, channel) do
+    queue_name = "new_" <> server_name <> "_queue"
+    exchange_name = ""
+    Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
-    # Declarar una cola y un exchange
-    queue_name = "compras_queue"
-    exchange_name = "test_exchange"
-
-    Queue.declare(channel, queue_name, durable: true)
-    Exchange.declare(channel, exchange_name, :direct, durable: true)
-
-    # Enlazar la cola con el exchange
-    Queue.bind(channel, queue_name, exchange_name)
-
-    # Publicar el mensaje
-    Basic.publish(channel, exchange_name, "", message)
-
-    IO.puts("Mensaje enviado: #{message}")
-
-    # Cerrar conexión
-    Channel.close(channel)
-    Connection.close(connection)
+    IO.puts("Mensaje enviado desde infracciones: #{inspect(message)}")
+    {:noreply, channel}
   end
-
 end
 
 defmodule Libremarket.Infracciones.Server do
@@ -133,7 +122,8 @@ defmodule Libremarket.Infracciones.Server do
         {:ok, contenido}
 
       {:error, _} ->
-        estado_inicial = %{}  # Estado por defecto si no se puede leer el estado
+        # Estado por defecto si no se puede leer el estado
+        estado_inicial = %{}
         Process.send_after(self(), :persistir_estado, 60_000)
         {:ok, estado_inicial}
 
@@ -144,18 +134,40 @@ defmodule Libremarket.Infracciones.Server do
         Process.send_after(self(), :persistir_estado, 60_000)
         {:ok, estado_inicial}
     end
-
-
   end
 
   @doc """
   Callback para un call :comprar
   """
+
+  @impl true
+  def handle_call({:detectar_infracciones, id_compra, id_producto}, _from, state) do
+    result = Libremarket.Infracciones.detectar_infracciones()
+
+    GenServer.cast(
+      {:global, Libremarket.Infracciones.MessageServer},
+      {:send_message, "compras", {:actualizar_infracciones, id_compra, result}}
+    )
+
+    # Libremarket.Infracciones.MessageServer.send_message(
+    #  {:actualizar_infracciones, id_compra, result}
+    # )
+
+    {:reply, result, [{id_producto, result} | state]}
+  end
+
   @impl true
   def handle_call({:detectar_infracciones, id}, _from, state) do
     result = Libremarket.Infracciones.detectar_infracciones()
     IO.puts("MANDADO")
-    Libremarket.Infracciones.MessageServer.send_message(inspect(result))
+
+    GenServer.cast(
+      {:global, Libremarket.Infracciones.MessageServer},
+      {:send_message, "compras", {:actualizar_infracciones, id, result}}
+    )
+
+    # Libremarket.Infracciones.MessageServer.send_message({:actualizar_infracciones, id, result})
+
     {:reply, result, [{id, result} | state]}
   end
 

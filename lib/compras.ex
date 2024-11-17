@@ -1,8 +1,14 @@
 defmodule Libremarket.Compras do
-  def seleccionar_producto(id) do
-    #infraccion = Libremarket.Infracciones.Server.detectar_infracciones(id)
-    Libremarket.Compras.MessageServer.send_message("{:detectar_infracciones, #{id}}")
-    #infraccion = Libremarket.Compras.MessageServer.receive_message()
+  def seleccionar_producto(id_compra, id) do
+    # infraccion = Libremarket.Infracciones.Server.detectar_infracciones(id)
+    # Libremarket.Compras.MessageServer.send_message({:detectar_infracciones, id_compra, id})
+
+    GenServer.cast(
+      {:global, Libremarket.Compras.MessageServer},
+      {:send_message, "infracciones", {:detectar_infracciones, id_compra, id}}
+    )
+
+    # infraccion = Libremarket.Compras.MessageServer.receive_message()
     reservado = Libremarket.Ventas.Server.reservar_producto(id)
     %{"producto" => %{"id" => id, "infraccion" => nil, "reservado" => reservado}}
   end
@@ -33,7 +39,7 @@ defmodule Libremarket.Compras do
   end
 
   def confirmar_compra(id, state) do
-    hay_infraccion = Map.get(Map.get(state, "producto"), "infraccion") == :hay_infraccion
+    hay_infraccion = Map.get(Map.get(state, "producto"), "new_infracciones") == :hay_infraccion
 
     if hay_infraccion do
       informar_infraccion(id)
@@ -83,34 +89,40 @@ defmodule Libremarket.Compras.MessageServer do
 
   @impl true
   def init(_opts) do
-    spawn(fn -> start()end)
-    {:ok, %{}}
+    # Conectar al servidor RabbitMQ
+    {:ok, connection} =
+      Connection.open(
+        "amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej",
+        ssl_options: [verify: :verify_none]
+      )
+
+    {:ok, channel} = Channel.open(connection)
+
+    # Declarar una cola
+    queue_name = "new_compras_queue"
+    Queue.declare(channel, queue_name, durable: true)
+
+    # Configurar el consumidor
+    Basic.consume(channel, queue_name, nil, no_ack: true)
+    {:ok, channel}
   end
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: {:global, __MODULE__})
   end
 
-  def start do
-    # Conectar al servidor RabbitMQ
-    {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
-    {:ok, channel} = Channel.open(connection)
+  @impl true
+  def handle_cast({:send_message, server_name, message}, channel) do
+    queue_name = "new_" <> server_name <> "_queue"
+    exchange_name = ""
+    Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
-    # Declarar una cola
-    queue_name = "test_queue"
-    Queue.declare(channel, queue_name, durable: true)
-
-    # Configurar el consumidor
-    Basic.consume(channel, queue_name, nil, no_ack: true)
-
-    # Iniciar el loop para recibir mensajes
-    receive_messages(channel)
+    IO.puts("Mensaje enviado desde compras: #{inspect(message)}")
+    {:noreply, channel}
   end
 
-  def send_message(message) do
-    IO.puts("ENVIANDO A INFRACCIONES")
-    {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
-    {:ok, channel} = Channel.open(connection)
+  def handle_info({:basic_deliver, payload, _meta}, state) do
+    eval_payload = :erlang.binary_to_term(payload)
 
     # Declarar una cola y un exchange
     queue_name = "test_queue"
@@ -160,25 +172,27 @@ defmodule Libremarket.Compras.MessageServer do
         # IO.puts("Mensaje recibido en compras_queue: #{payload}")
         {eval_payload, _bindings} = Code.eval_string(payload)
         eval_payload  # Retornar el payload evaluado
-    end
+    # case eval_payload do
+    #   {:actualizar_infracciones, id_compra, infraccion} ->
+    #     # Realiza la llamada a detectar infracciones
+    #     GenServer.call(
+    #       {:global, Libremarket.Compras.Server},
+    #       {:actualizar_infracciones, id_compra, infraccion}
+    #     )
+    # end
 
-    # Cerrar canal y conexión
-    Channel.close(channel)
-    Connection.close(connection)
-
-    res
+    IO.puts("RECIBIDO EN COMPRAS #{inspect(eval_payload)}")
+    {:noreply, state}
   end
 
   @impl true
   def handle_info({:basic_consume_ok, _consumer_tag}, state) do
-    # Se ignora este mensaje ya que es solo una confirmación
     {:noreply, state}
   end
 
   def handle_info(_, state) do
     {:noreply, state}
   end
-
 end
 
 defmodule Libremarket.Compras.Server do
@@ -234,7 +248,8 @@ defmodule Libremarket.Compras.Server do
         {:ok, contenido}
 
       {:error, _} ->
-        estado_inicial = %{}  # Estado por defecto si no se puede leer el estado
+        # Estado por defecto si no se puede leer el estado
+        estado_inicial = %{}
         Process.send_after(self(), :persistir_estado, 60_000)
         {:ok, estado_inicial}
 
@@ -245,7 +260,25 @@ defmodule Libremarket.Compras.Server do
         Process.send_after(self(), :persistir_estado, 60_000)
         {:ok, estado_inicial}
     end
+  end
 
+  @impl true
+  def handle_call({:actualizar_infracciones, id_compra, infraccion}, _from, state) do
+    # hay_infraccion = Map.get(Map.get(state, "producto"), "infraccion") == :hay_infraccion
+    # infraccion_state = Map.get(Map.get(state, "producto"), "infraccion")
+
+    # IO.puts("Actualizando...")
+    IO.puts(id_compra)
+    compra_state = Map.get(state, id_compra)
+    producto_state = Map.get(compra_state, "producto")
+    new_producto_state = Map.merge(producto_state, %{"infraccion" => elem(infraccion, 0)})
+    new_compra_state = Map.put(compra_state, "producto", new_producto_state)
+    new_state = Map.put(state, id_compra, new_compra_state)
+    # IO.puts(inspect(new_state))
+    # new_producto_state = Map.merge(producto_state, %{"infraccion" => infraccion})
+    # new_compra_state = Map.merge(compra_state, new_producto_state)
+    # new_state = Map.merge(state, new_compra_state)
+    {:reply, state, new_state}
   end
 
   @impl true
@@ -256,10 +289,11 @@ defmodule Libremarket.Compras.Server do
 
   @impl true
   def handle_call({:seleccionar_producto, id_compra, id_producto}, _from, state) do
-    result = Libremarket.Compras.seleccionar_producto(id_producto)
+    result = Libremarket.Compras.seleccionar_producto(id_compra, id_producto)
     actual_item_state = Map.get(state, id_compra)
     new_item_state = Map.merge(actual_item_state, result)
     new_state = Map.put(state, id_compra, new_item_state)
+    IO.puts(inspect(new_item_state))
     {:reply, new_state, new_state}
   end
 
