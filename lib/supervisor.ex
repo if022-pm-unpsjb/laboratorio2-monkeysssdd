@@ -31,6 +31,8 @@ defmodule Libremarket.Supervisor do
       Libremarket.Ventas.Server,
       Libremarket.Infracciones.MessageServer,
       Libremarket.Compras.MessageServer,
+      Libremarket.Pagos.MessageServer,
+      Libremarket.Envios.MessageServer,
       {Cluster.Supervisor, [topologies, [name: MyApp.ClusterSupervisor]]}
     ]
 

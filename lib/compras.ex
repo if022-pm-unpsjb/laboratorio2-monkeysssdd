@@ -124,62 +124,14 @@ defmodule Libremarket.Compras.MessageServer do
   def handle_info({:basic_deliver, payload, _meta}, state) do
     eval_payload = :erlang.binary_to_term(payload)
 
-    # Declarar una cola y un exchange
-    queue_name = "test_queue"
-    exchange_name = "test_exchange"
-
-    Queue.declare(channel, queue_name, durable: true)
-    Exchange.declare(channel, exchange_name, :direct, durable: true)
-
-    # Usar una clave de enrutamiento específica para infracciones
-    routing_key = "infracciones_key"
-    Queue.bind(channel, queue_name, exchange_name, routing_key: routing_key)
-
-    # Publicar el mensaje con la clave de enrutamiento
-    Basic.publish(channel, exchange_name, routing_key, message)
-
-    IO.puts("Mensaje enviado: #{message}")
-
-    Channel.close(channel)
-    Connection.close(connection)
-  end
-
-
-  defp receive_messages(channel) do
-    IO.puts("ESPERANDO EN COMPRAS")
-    receive do
-      {:basic_deliver, payload, _meta} ->
-        IO.puts("RECIBIDO EN COMPRAS #{payload}")
-        receive_messages(channel)
+    case eval_payload do
+      {:actualizar_infracciones, id_compra, infraccion} ->
+        # Realiza la llamada a detectar infracciones
+        GenServer.call(
+          {:global, Libremarket.Compras.Server},
+          {:actualizar_infracciones, id_compra, infraccion}
+        )
     end
-  end
-
-  def receive_message() do
-    {:ok, connection} = Connection.open("amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej", ssl_options: [verify: :verify_none])
-    {:ok, channel} = Channel.open(connection)
-
-    # Declarar la cola
-    queue_name = "compras_queue"
-    Queue.declare(channel, queue_name, durable: true)
-
-    # Configurar el consumidor
-    Basic.consume(channel, queue_name, nil, no_ack: true)
-
-    IO.puts("compras receive message")
-    # Recibir el mensaje de compras_queue
-    res = receive do
-      {:basic_deliver, payload, _meta} ->
-        # IO.puts("Mensaje recibido en compras_queue: #{payload}")
-        {eval_payload, _bindings} = Code.eval_string(payload)
-        eval_payload  # Retornar el payload evaluado
-    # case eval_payload do
-    #   {:actualizar_infracciones, id_compra, infraccion} ->
-    #     # Realiza la llamada a detectar infracciones
-    #     GenServer.call(
-    #       {:global, Libremarket.Compras.Server},
-    #       {:actualizar_infracciones, id_compra, infraccion}
-    #     )
-    # end
 
     IO.puts("RECIBIDO EN COMPRAS #{inspect(eval_payload)}")
     {:noreply, state}

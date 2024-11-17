@@ -10,6 +10,77 @@ defmodule Libremarket.Pagos do
   end
 end
 
+defmodule Libremarket.Pagos.MessageServer do
+  # use GenServer
+  use AMQP
+  use GenServer
+
+  @impl true
+  def init(_opts) do
+    {:ok, start()}
+  end
+
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: {:global, __MODULE__})
+  end
+
+  def start do
+    # Conectar al servidor RabbitMQ
+    {:ok, connection} =
+      Connection.open(
+        "amqps://bpxlyvej:BrB1fZjd60Ix5DV7IxIH8RbuGswFQ7nM@jackal.rmq.cloudamqp.com/bpxlyvej",
+        ssl_options: [verify: :verify_none]
+      )
+
+    {:ok, channel} = Channel.open(connection)
+
+    # Declarar una cola
+    queue_name = "new_pagos_queue"
+    Queue.declare(channel, queue_name, durable: false)
+
+    # Configurar el consumidor
+    Basic.consume(channel, queue_name, nil, no_ack: true)
+
+    channel
+    # Iniciar el loop para recibir mensajes
+    # receive_messages(channel)
+  end
+
+  def handle_info({:basic_deliver, payload, _meta}, state) do
+    # Evalúa el payload recibido
+    eval_payload = :erlang.binary_to_term(payload)
+
+    case eval_payload do
+      {:autorizarPago, id} ->
+        # Realiza la llamada a autorizar pago
+        GenServer.call(
+          {:global, Libremarket.Pagos.Server},
+          {:autorizarPago, id}
+        )
+    end
+
+    IO.puts("Mensaje recibido en pagos: #{inspect(:erlang.binary_to_term(payload))}")
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:basic_consume_ok, _meta}, state) do
+    IO.puts("RECIBIDO EN PAGOS BASIC_CONSUME")
+    # Ignorar el mensaje de confirmación de consumo
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({:send_message, server_name, message}, channel) do
+    queue_name = "new_" <> server_name <> "_queue"
+    exchange_name = ""
+    Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
+
+    IO.puts("Mensaje enviado desde pagos: #{inspect(message)}")
+    {:noreply, channel}
+  end
+end
+
 defmodule Libremarket.Pagos.Server do
   @moduledoc """
   Pagos
@@ -61,11 +132,21 @@ end
   @doc """
   Callback para un call :comprar
   """
-  @impl true
-  def handle_call({:autorizarPago, id}, _from, state) do
-    result = Libremarket.Pagos.autorizarPago(id)
-    {:reply, result, [{id, result} | state]}
-  end
+@impl true
+def handle_call({:autorizarPago, id}, _from, state) do
+  # Lógica de autorización del pago
+  result = Libremarket.Pagos.autorizarPago(id)
+
+  # Enviar el mensaje al MessageServer
+  GenServer.cast(
+    {:global, Libremarket.Pagos.MessageServer},
+    {:send_message, "compras", {:actualizar_pago, id, result}}
+  )
+
+  # Devolver la respuesta y actualizar el estado
+  {:reply, result, [{id, result} | state]}
+end
+
 
   @impl true
   def handle_info(:persistir_estado, state) do
