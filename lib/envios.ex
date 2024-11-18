@@ -8,7 +8,6 @@ defmodule Libremarket.Envios do
   end
 end
 
-
 defmodule Libremarket.Envios.MessageServer do
   use GenServer
   use AMQP
@@ -64,6 +63,11 @@ defmodule Libremarket.Envios.MessageServer do
   end
 
   @impl true
+  def handle_info({:basic_consume_ok, _consumer_tag}, state) do
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_cast({:send_message, server_name, message}, channel) do
     queue_name = "new_" <> server_name <> "_queue"
     exchange_name = ""
@@ -73,7 +77,6 @@ defmodule Libremarket.Envios.MessageServer do
     {:noreply, channel}
   end
 end
-
 
 defmodule Libremarket.Envios.Server do
   use GenServer
@@ -98,61 +101,62 @@ defmodule Libremarket.Envios.Server do
 
   # Callbacks
   @impl true
-def init(_opts) do
-  case Libremarket.Persistencia.leer_estado("envios") do
-    {:ok, contenido} ->
-      Process.send_after(self(), :persistir_estado, 60_000)
-      {:ok, contenido}
+  def init(_opts) do
+    case Libremarket.Persistencia.leer_estado("envios") do
+      {:ok, contenido} ->
+        Process.send_after(self(), :persistir_estado, 60_000)
+        {:ok, contenido}
 
-    {:error, _} ->
-      estado_inicial = %{}  # Estado por defecto si no se puede leer el estado
-      Process.send_after(self(), :persistir_estado, 60_000)
-      {:ok, estado_inicial}
+      {:error, _} ->
+        # Estado por defecto si no se puede leer el estado
+        estado_inicial = %{}
+        Process.send_after(self(), :persistir_estado, 60_000)
+        {:ok, estado_inicial}
 
-    :ok ->
-      # Manejo explícito si por alguna razón obtienes :ok en lugar de {:ok, contenido}
-      IO.puts("Advertencia: se obtuvo :ok sin contenido en leer_estado")
-      estado_inicial = %{}
-      Process.send_after(self(), :persistir_estado, 60_000)
-      {:ok, estado_inicial}
+      :ok ->
+        # Manejo explícito si por alguna razón obtienes :ok en lugar de {:ok, contenido}
+        IO.puts("Advertencia: se obtuvo :ok sin contenido en leer_estado")
+        estado_inicial = %{}
+        Process.send_after(self(), :persistir_estado, 60_000)
+        {:ok, estado_inicial}
+    end
   end
-end
 
-@impl true
-def handle_call({:calcular_costo, id}, _from, state) do
-  result = Libremarket.Envios.calcular_costo()
+  @impl true
+  def handle_call({:calcular_costo, id}, _from, state) do
+    result = Libremarket.Envios.calcular_costo()
 
-  # Enviar mensaje al servidor de compras
-  GenServer.cast(
-    {:global, Libremarket.Envios.MessageServer},
-    {:send_message, "compras", {:actualizar_costo, id, result}}
-  )
+    # Enviar mensaje al servidor de compras
+    GenServer.cast(
+      {:global, Libremarket.Envios.MessageServer},
+      {:send_message, "compras", {:actualizar_costo, id, result}}
+    )
 
-  nuevo_estado =
-    Map.update(state, id, %{costo: result, agendado: false}, fn envio ->
-      Map.put(envio, :costo, result)
-    end)
+    nuevo_estado =
+      Map.update(state, id, %{costo: result, agendado: false}, fn envio ->
+        Map.put(envio, :costo, result)
+      end)
 
-  {:reply, result, nuevo_estado}
-end
+    {:reply, result, nuevo_estado}
+  end
 
-@impl true
-def handle_call({:agendar_envio, id}, _from, state) do
-  result = Libremarket.Envios.agendar_envio(id)
+  @impl true
+  def handle_call({:agendar_envio, id}, _from, state) do
+    result = Libremarket.Envios.agendar_envio(id)
 
-  # Enviar mensaje al servidor de compras
-  GenServer.cast(
-    {:global, Libremarket.Envios.MessageServer},
-    {:send_message, "compras", {:actualizar_envio, id, result}}
-  )
+    # Enviar mensaje al servidor de compras
+    GenServer.cast(
+      {:global, Libremarket.Envios.MessageServer},
+      {:send_message, "compras", {:actualizar_envio, id, result}}
+    )
 
-  nuevo_estado =
-    Map.update(state, id, %{costo: 0, agendado: true}, fn envio ->
-      Map.put(envio, :agendado, true)
-    end)
+    nuevo_estado =
+      Map.update(state, id, %{costo: 0, agendado: true}, fn envio ->
+        Map.put(envio, :agendado, true)
+      end)
 
-  {:reply, result, nuevo_estado}
-end
+    {:reply, result, nuevo_estado}
+  end
 
   @impl true
   def handle_call(:listar_envios, _from, state) do

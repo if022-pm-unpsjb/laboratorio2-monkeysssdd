@@ -3,9 +3,9 @@ defmodule Libremarket.Pagos do
     pago = :rand.uniform(100) <= 70
 
     if pago do
-      {:pago_autorizado}
+      :pago_autorizado
     else
-      {:pago_rechazado}
+      :pago_rechazado
     end
   end
 end
@@ -51,11 +51,11 @@ defmodule Libremarket.Pagos.MessageServer do
     eval_payload = :erlang.binary_to_term(payload)
 
     case eval_payload do
-      {:autorizarPago, id} ->
+      {:autorizar_pago, id} ->
         # Realiza la llamada a autorizar pago
         GenServer.call(
           {:global, Libremarket.Pagos.Server},
-          {:autorizarPago, id}
+          {:autorizar_pago, id}
         )
     end
 
@@ -98,7 +98,7 @@ defmodule Libremarket.Pagos.Server do
   end
 
   def autorizarPago(id \\ 0, pid \\ __MODULE__) do
-    GenServer.call({:global, __MODULE__}, {:autorizarPago, id})
+    GenServer.call({:global, __MODULE__}, {:autorizar_pago, id})
   end
 
   # Callbacks
@@ -108,45 +108,44 @@ defmodule Libremarket.Pagos.Server do
   """
 
   @impl true
-def init(_opts) do
-  case Libremarket.Persistencia.leer_estado("pagos") do
-    {:ok, contenido} ->
-      Process.send_after(self(), :persistir_estado, 60_000)
-      {:ok, contenido}
+  def init(_opts) do
+    case Libremarket.Persistencia.leer_estado("pagos") do
+      {:ok, contenido} ->
+        Process.send_after(self(), :persistir_estado, 60_000)
+        {:ok, contenido}
 
-    {:error, _} ->
-      estado_inicial = %{}  # Estado por defecto si no se puede leer el estado
-      Process.send_after(self(), :persistir_estado, 60_000)
-      {:ok, estado_inicial}
+      {:error, _} ->
+        # Estado por defecto si no se puede leer el estado
+        estado_inicial = %{}
+        Process.send_after(self(), :persistir_estado, 60_000)
+        {:ok, estado_inicial}
 
-    :ok ->
-      # Manejo explícito si por alguna razón obtienes :ok en lugar de {:ok, contenido}
-      IO.puts("Advertencia: se obtuvo :ok sin contenido en leer_estado")
-      estado_inicial = %{}
-      Process.send_after(self(), :persistir_estado, 60_000)
-      {:ok, estado_inicial}
+      :ok ->
+        # Manejo explícito si por alguna razón obtienes :ok en lugar de {:ok, contenido}
+        IO.puts("Advertencia: se obtuvo :ok sin contenido en leer_estado")
+        estado_inicial = %{}
+        Process.send_after(self(), :persistir_estado, 60_000)
+        {:ok, estado_inicial}
+    end
   end
-end
-
 
   @doc """
   Callback para un call :comprar
   """
-@impl true
-def handle_call({:autorizarPago, id}, _from, state) do
-  # Lógica de autorización del pago
-  result = Libremarket.Pagos.autorizarPago(id)
+  @impl true
+  def handle_call({:autorizar_pago, id}, _from, state) do
+    # Lógica de autorización del pago
+    result = Libremarket.Pagos.autorizarPago(id)
 
-  # Enviar el mensaje al MessageServer
-  GenServer.cast(
-    {:global, Libremarket.Pagos.MessageServer},
-    {:send_message, "compras", {:actualizar_pago, id, result}}
-  )
+    # Enviar el mensaje al MessageServer
+    GenServer.cast(
+      {:global, Libremarket.Pagos.MessageServer},
+      {:send_message, "compras", {:actualizar_pago, id, result}}
+    )
 
-  # Devolver la respuesta y actualizar el estado
-  {:reply, result, [{id, result} | state]}
-end
-
+    # Devolver la respuesta y actualizar el estado
+    {:reply, result, [{id, result} | state]}
+  end
 
   @impl true
   def handle_info(:persistir_estado, state) do

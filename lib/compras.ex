@@ -9,8 +9,13 @@ defmodule Libremarket.Compras do
     )
 
     # infraccion = Libremarket.Compras.MessageServer.receive_message()
-    reservado = Libremarket.Ventas.Server.reservar_producto(id)
-    %{"producto" => %{"id" => id, "infraccion" => nil, "reservado" => reservado}}
+    GenServer.cast(
+      {:global, Libremarket.Compras.MessageServer},
+      {:send_message, "ventas", {:reservar_producto, id_compra, id}}
+    )
+
+    # reservado = Libremarket.Ventas.Server.reservar_producto(id)
+    %{"producto" => %{"id" => id, "infraccion" => nil, "reservado" => nil}}
   end
 
   def seleccionar_forma_entrega(id_compra) do
@@ -18,8 +23,14 @@ defmodule Libremarket.Compras do
 
     if forma do
       forma = :correo
-      costo = Libremarket.Envios.Server.calcular_costo(id_compra)
-      %{"forma_entrega" => forma, "costo_envio" => costo}
+
+      GenServer.cast(
+        {:global, Libremarket.Compras.MessageServer},
+        {:send_message, "envios", {:calcular_costo, id_compra}}
+      )
+
+      # costo = Libremarket.Envios.Server.calcular_costo(id_compra)
+      %{"forma_entrega" => forma, "costo_envio" => nil}
       # seleccionar_medio_pago(id, costo, correo)
     else
       forma = :retira
@@ -39,6 +50,23 @@ defmodule Libremarket.Compras do
   end
 
   def confirmar_compra(id, state) do
+    hay_infraccion = Map.get(Map.get(state, "producto"), "new_infracciones") == :hay_infraccion
+
+    if hay_infraccion do
+      informar_infraccion(id)
+      %{"estado" => :hay_infraccion}
+    else
+      # pago_autorizado = elem(Libremarket.Pagos.Server.autorizarPago(id), 0)
+      GenServer.cast(
+        {:global, Libremarket.Compras.MessageServer},
+        {:send_message, "pagos", {:autorizar_pago, id}}
+      )
+
+      %{"estado" => nil}
+    end
+  end
+
+  def confirmar_compra2(id, state) do
     hay_infraccion = Map.get(Map.get(state, "producto"), "new_infracciones") == :hay_infraccion
 
     if hay_infraccion do
@@ -118,6 +146,7 @@ defmodule Libremarket.Compras.MessageServer do
     Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
     IO.puts("Mensaje enviado desde compras: #{inspect(message)}")
+    IO.puts(queue_name)
     {:noreply, channel}
   end
 
@@ -130,6 +159,24 @@ defmodule Libremarket.Compras.MessageServer do
         GenServer.call(
           {:global, Libremarket.Compras.Server},
           {:actualizar_infracciones, id_compra, infraccion}
+        )
+
+      {:actualizar_reserva, id_compra, reserva} ->
+        GenServer.call(
+          {:global, Libremarket.Compras.Server},
+          {:actualizar_reserva, id_compra, reserva}
+        )
+
+      {:actualizar_costo, id_compra, result} ->
+        GenServer.call(
+          {:global, Libremarket.Compras.Server},
+          {:actualizar_costo, id_compra, result}
+        )
+
+      {:actualizar_pago, id_compra, result} ->
+        GenServer.call(
+          {:global, Libremarket.Compras.Server},
+          {:actualizar_pago, id_compra, result}
         )
     end
 
@@ -215,21 +262,64 @@ defmodule Libremarket.Compras.Server do
   end
 
   @impl true
-  def handle_call({:actualizar_infracciones, id_compra, infraccion}, _from, state) do
-    # hay_infraccion = Map.get(Map.get(state, "producto"), "infraccion") == :hay_infraccion
-    # infraccion_state = Map.get(Map.get(state, "producto"), "infraccion")
+  def handle_call({:actualizar_costo, id_compra, result}, _from, state) do
+    compra_state = Map.get(state, id_compra)
+    new_compra_state = Map.merge(compra_state, %{"costo_envio" => result})
+    new_state = Map.put(state, id_compra, new_compra_state)
+    {:reply, state, new_state}
+  end
 
-    # IO.puts("Actualizando...")
+  @impl true
+  def handle_call({:actualizar_pago, id_compra, pago_autorizado}, _from, state) do
+    result =
+      case pago_autorizado do
+        :pago_rechazado -> :pago_rechazado
+        _ -> :confirmada
+      end
+
+    if pago_autorizado == :pago_rechazado do
+      Libremarket.Compras.informar_pago_rechazado(id_compra)
+      # result = :pago_rechazado
+    else
+      correo = Map.get(state, "forma_entrega") == :correo
+
+      if correo do
+        # Libremarket.Envios.Server.agendar_envio(id)
+        GenServer.cast(
+          {:global, Libremarket.Compras.MessageServer},
+          {:send_message, "envios", {:agendar_envio, id_compra}}
+        )
+      end
+
+      Libremarket.Compras.informar_confirmar_compra(id_compra)
+      # result = :confirmada
+    end
+
+    compra_state = Map.get(state, id_compra)
+    new_compra_state = Map.merge(compra_state, %{"estado" => result})
+    new_state = Map.put(state, id_compra, new_compra_state)
+    {:reply, state, new_state}
+  end
+
+  @impl true
+  def handle_call({:actualizar_reserva, id_compra, reserva}, _from, state) do
+    IO.puts(id_compra)
+    compra_state = Map.get(state, id_compra)
+    producto_state = Map.get(compra_state, "producto")
+    new_producto_state = Map.merge(producto_state, %{"reservado" => reserva})
+    new_compra_state = Map.put(compra_state, "producto", new_producto_state)
+    new_state = Map.put(state, id_compra, new_compra_state)
+    {:reply, state, new_state}
+  end
+
+  @impl true
+  def handle_call({:actualizar_infracciones, id_compra, infraccion}, _from, state) do
     IO.puts(id_compra)
     compra_state = Map.get(state, id_compra)
     producto_state = Map.get(compra_state, "producto")
     new_producto_state = Map.merge(producto_state, %{"infraccion" => elem(infraccion, 0)})
     new_compra_state = Map.put(compra_state, "producto", new_producto_state)
     new_state = Map.put(state, id_compra, new_compra_state)
-    # IO.puts(inspect(new_state))
-    # new_producto_state = Map.merge(producto_state, %{"infraccion" => infraccion})
-    # new_compra_state = Map.merge(compra_state, new_producto_state)
-    # new_state = Map.merge(state, new_compra_state)
     {:reply, state, new_state}
   end
 
