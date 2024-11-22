@@ -51,14 +51,17 @@ defmodule Libremarket.Envios.MessageServer do
           {:calcular_costo, id}
         )
 
+        IO.puts("Calculando costo de #{id}...")
+
       {:agendar_envio, id} ->
         GenServer.call(
           {:global, Libremarket.Envios.Server},
           {:agendar_envio, id}
         )
+
+        IO.puts("Agendando envío de #{id}...")
     end
 
-    IO.puts("Mensaje recibido en envíos: #{inspect(eval_payload)}")
     {:noreply, state}
   end
 
@@ -73,7 +76,6 @@ defmodule Libremarket.Envios.MessageServer do
     exchange_name = ""
     Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
-    IO.puts("Mensaje enviado desde envíos: #{inspect(message)}")
     {:noreply, channel}
   end
 end

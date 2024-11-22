@@ -57,15 +57,17 @@ defmodule Libremarket.Pagos.MessageServer do
           {:global, Libremarket.Pagos.Server},
           {:autorizar_pago, id}
         )
+
+        IO.puts("Autorizando pago de #{id}...")
     end
 
-    IO.puts("Mensaje recibido en pagos: #{inspect(:erlang.binary_to_term(payload))}")
+    # IO.puts("Mensaje recibido en pagos: #{inspect(:erlang.binary_to_term(payload))}")
     {:noreply, state}
   end
 
   @impl true
   def handle_info({:basic_consume_ok, _meta}, state) do
-    IO.puts("RECIBIDO EN PAGOS BASIC_CONSUME")
+    # IO.puts("RECIBIDO EN PAGOS BASIC_CONSUME")
     # Ignorar el mensaje de confirmación de consumo
     {:noreply, state}
   end
@@ -76,7 +78,7 @@ defmodule Libremarket.Pagos.MessageServer do
     exchange_name = ""
     Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
-    IO.puts("Mensaje enviado desde pagos: #{inspect(message)}")
+    # IO.puts("Mensaje enviado desde pagos: #{inspect(message)}")
     {:noreply, channel}
   end
 end

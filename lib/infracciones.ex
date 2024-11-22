@@ -57,15 +57,15 @@ defmodule Libremarket.Infracciones.MessageServer do
           {:global, Libremarket.Infracciones.Server},
           {:detectar_infracciones, id_compra, id_producto}
         )
+
+        IO.puts("Detectando infracciones de #{id_compra}...")
     end
 
-    IO.puts("Mensaje recibido en infracciones: #{inspect(:erlang.binary_to_term(payload))}")
     {:noreply, state}
   end
 
   @impl true
   def handle_info({:basic_consume_ok, _meta}, state) do
-    IO.puts("RECIBIDO EN INFRACCIONES BASIC_CONSUME")
     # Ignorar el mensaje de confirmación de consumo
     {:noreply, state}
   end
@@ -76,7 +76,7 @@ defmodule Libremarket.Infracciones.MessageServer do
     exchange_name = ""
     Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
-    IO.puts("Mensaje enviado desde infracciones: #{inspect(message)}")
+    # IO.puts("Mensaje enviado desde infracciones: #{inspect(message)}")
     {:noreply, channel}
   end
 end
@@ -159,7 +159,6 @@ defmodule Libremarket.Infracciones.Server do
   @impl true
   def handle_call({:detectar_infracciones, id}, _from, state) do
     result = Libremarket.Infracciones.detectar_infracciones()
-    IO.puts("MANDADO")
 
     GenServer.cast(
       {:global, Libremarket.Infracciones.MessageServer},
