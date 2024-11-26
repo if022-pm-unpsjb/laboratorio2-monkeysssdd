@@ -149,6 +149,23 @@ defmodule Libremarket.Pagos.Server do
     {:reply, result, [{id, result} | state]}
   end
 
+  @doc """
+  Callback para un call de :ventas
+  """
+  @impl true
+  def handle_call({:pago_autorizado, id}, _from, state) do
+    # Lógica de autorización del pago
+    result = Libremarket.Pagos.autorizarPago(id)
+
+    GenServer.cast(
+      {:global, Libremarket.Pagos.MessageServer},
+      {:send_message, "ventas", {:actualizar_pago, id, result}}
+    )
+
+    # Devolver la respuesta y actualizar el estado
+    {:reply, result, [{id, result} | state]}
+  end
+
   @impl true
   def handle_info(:persistir_estado, state) do
     Libremarket.Persistencia.escribir_estado(state, "pagos")

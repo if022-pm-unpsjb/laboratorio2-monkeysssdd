@@ -1,42 +1,54 @@
 defmodule Libremarket.Ventas do
-  def reservar_producto(producto_id) do
+  def reservar_producto(id_compra, id_producto) do
+    GenServer.cast(
+      {:global, Libremarket.Compras.MessageServer},
+      {:send_message, "infracciones", {:detectar_infracciones, id_compra, id_producto}}
+    )
+
     true
   end
 
-  def hubo_infraccion(producto_id) do
-    infraccion =
-      Enum.find(Libremarket.Infracciones.Server.listar_infracciones(), fn {id, _value} ->
-        id == producto_id
-      end)
+  def hubo_infraccion(producto_id, infraccion) do
+    # hay_infraccion = Map.get(Map.get(state_item_actual, "producto"), "infraccion") == :hay_infraccion
 
-    if reservar_producto(producto_id) and not infraccion do
-      liberar_producto(producto_id)
-    else
-      pago_autorizado(producto_id)
+    IO.puts("Ventas: revisando infraccion #{inspect(producto_id)}")
+
+    case elem(infraccion, 0) do
+      :hay_infraccion ->
+        liberar_producto(producto_id)
+      _ ->
+        GenServer.cast(
+          {:global, Libremarket.Ventas.MessageServer},
+          {:send_message, "pagos", {:pago_autorizado, producto_id}}
+        )
     end
   end
 
-  def pago_autorizado(producto_id) do
-    se_autorizo_pago = Libremarket.Pagos.Server.autorizarPago(producto_id)
-
-    if se_autorizo_pago == {:pago_autorizado} do
-      enviar_producto(producto_id)
-    else
-      liberar_producto(producto_id)
-    end
+  def pago_autorizado(producto_id, se_autorizo_pago) do
+    result =
+      case se_autorizo_pago do
+        :pago_autorizado ->
+          enviar_producto(producto_id)
+        
+        _ ->
+              liberar_producto(producto_id)
+      end      
   end
 
   def liberar_producto(producto_id) do
     producto_liberado = :rand.uniform(100) <= 30
 
     if producto_liberado do
+      IO.puts("Producto liberado #{inspect(producto_id)}")
       true
     else
+      IO.puts("Producto no liberado #{inspect(producto_id)}")
       false
     end
   end
-
+  
   def enviar_producto(producto_id) do
+    IO.puts("Ventas: Producto enviado #{inspect(producto_id)}")
     producto_id
   end
 end
@@ -91,7 +103,31 @@ defmodule Libremarket.Ventas.MessageServer do
           {:reservar_producto, id_compra, id_producto}
         )
 
-        IO.puts("Reservando producto #{id_producto}...")
+        IO.puts("Ventas: Reservando producto #{id_producto}...")
+
+      {:liberar_producto, id_compra, result} ->
+        GenServer.call(
+          {:global, Libremarket.Ventas.Server},
+          {:liberar_producto, id_compra, result}
+        )
+
+        IO.puts("Ventas: Liberando producto #{inspect(id_compra)}: #{inspect(result)}")
+          
+      {:actualizar_pago, id_compra, result} ->
+        GenServer.call(
+          {:global, Libremarket.Ventas.Server},
+          {:pago_autorizado, id_compra, result}
+        )
+
+        IO.puts("Ventas: pago autorizado #{inspect(id_compra)}: #{inspect(result)}")
+
+      {:hubo_infraccion, id_compra, result} ->
+        GenServer.call(
+          {:global, Libremarket.Ventas.Server},
+          {:hubo_infraccion, id_compra, result}
+        )
+
+        IO.puts("Ventas: esperando infracciones #{inspect(id_compra)}: #{inspect(result)}")
     end
 
     {:noreply, state}
@@ -123,8 +159,8 @@ defmodule Libremarket.Ventas.Server do
     GenServer.start_link(__MODULE__, opts, name: {:global, __MODULE__})
   end
 
-  def reservar_producto(id \\ 0, pid \\ __MODULE__) do
-    GenServer.call({:global, __MODULE__}, {:reservar_producto, id})
+  def reservar_producto(id_compra, id_producto \\ 0, pid \\ __MODULE__) do
+    GenServer.call({:global, __MODULE__}, {:reservar_producto, id_compra, id_producto})
   end
 
   def pago_autorizado(pid \\ __MODULE__) do
@@ -171,8 +207,26 @@ defmodule Libremarket.Ventas.Server do
   """
   @impl true
   def handle_call({:reservar_producto, id_compra, id_producto}, _from, state) do
-    result = Libremarket.Ventas.reservar_producto(id_producto)
+    result = Libremarket.Ventas.reservar_producto(id_compra, id_producto)
     {:reply, result, [{id_producto, result} | state]}
+  end
+
+  @impl true
+  def handle_call({:actualizar_pago, id_compra, result}, _from, state) do
+    result = Libremarket.Ventas.pago_autorizado(id_compra, result)
+    {:reply, result, [{id_compra, result} | state]}
+  end
+
+  @impl true
+  def handle_call({:hubo_infraccion, id_compra, infraccion}, _from, state) do
+    result = Libremarket.Ventas.hubo_infraccion(id_compra, infraccion)
+
+    {:noreply, state}
+  end
+  
+  @impl true
+  def handle_cast({:hubo_infraccion, id_compra}, state) do
+
   end
 
   @impl true
