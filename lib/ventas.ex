@@ -25,13 +25,15 @@ defmodule Libremarket.Ventas do
   end
 
   def pago_autorizado(producto_id, se_autorizo_pago) do
+    # IO.puts("VENTAS: pago_autorizado --> #{inspect(producto_id)}")
+
     result =
       case se_autorizo_pago do
         :pago_autorizado ->
           enviar_producto(producto_id)
 
         _ ->
-              liberar_producto(producto_id)
+            liberar_producto(producto_id)
       end
   end
 
@@ -113,7 +115,7 @@ defmodule Libremarket.Ventas.MessageServer do
 
         IO.puts("Ventas: Liberando producto #{inspect(id_compra)}: #{inspect(result)}")
 
-      {:actualizar_pago, id_compra, result} ->
+      {:pago_autorizado, id_compra, result} ->
         GenServer.call(
           {:global, Libremarket.Ventas.Server},
           {:pago_autorizado, id_compra, result}
@@ -212,8 +214,8 @@ defmodule Libremarket.Ventas.Server do
   end
 
   @impl true
-  def handle_call({:actualizar_pago, id_compra, result}, _from, state) do
-    result = Libremarket.Ventas.pago_autorizado(id_compra, result)
+  def handle_call({:pago_autorizado, id_compra, pago_autorizado}, _from, state) do
+    result = Libremarket.Ventas.pago_autorizado(id_compra, pago_autorizado)
     {:reply, result, [{id_compra, result} | state]}
   end
 

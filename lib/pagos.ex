@@ -151,6 +151,12 @@ defmodule Libremarket.Pagos.Server do
       {:send_message, "compras", {:actualizar_pago, id, result}}
     )
 
+    # Enviar el mensaje al MessageServer
+    GenServer.cast(
+      {:global, Libremarket.Pagos.MessageServer},
+      {:send_message, "ventas", {:pago_autorizado, id, result}}
+    )
+
     # Devolver la respuesta y actualizar el estado
     {:reply, result, [{id, result} | state]}
   end
