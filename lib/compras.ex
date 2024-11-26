@@ -398,7 +398,7 @@ defmodule Libremarket.Compras.Server do
 
     if result == :waiting do
       Process.sleep(200)
-      IO.puts("Esperando")
+      #IO.puts("Esperando")
       GenServer.cast({:global, __MODULE__}, {:confirmar_compra3, id_compra})
 
       {:noreply, state}

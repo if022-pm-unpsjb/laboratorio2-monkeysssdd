@@ -85,10 +85,10 @@ defmodule Libremarket.Ventas.MessageServer do
     eval_payload = :erlang.binary_to_term(payload)
 
     case eval_payload do
-      {:reservar_producto, id_producto } ->
+      {:reservar_producto, id_compra, id_producto } ->
         GenServer.call(
           {:global, Libremarket.Ventas.Server},
-          {:reservar_producto, id_producto}
+          {:reservar_producto, id_compra, id_producto}
         )
 
         IO.puts("Reservando producto #{id_producto}...")
@@ -170,9 +170,9 @@ defmodule Libremarket.Ventas.Server do
   Callback para un call :ventas
   """
   @impl true
-  def handle_call({:reservar_producto, id}, _from, state) do
-    result = Libremarket.Ventas.reservar_producto(id)
-    {:reply, result, [{id, result} | state]}
+  def handle_call({:reservar_producto, id_compra, id_producto}, _from, state) do
+    result = Libremarket.Ventas.reservar_producto(id_producto)
+    {:reply, result, [{id_producto, result} | state]}
   end
 
   @impl true
