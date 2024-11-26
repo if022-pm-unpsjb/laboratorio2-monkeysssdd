@@ -47,23 +47,27 @@ defmodule Libremarket.Pagos.MessageServer do
   end
 
   def handle_info({:basic_deliver, payload, _meta}, state) do
-    # Evalúa el payload recibido
     eval_payload = :erlang.binary_to_term(payload)
 
     case eval_payload do
       {:autorizar_pago, id} ->
-        # Realiza la llamada a autorizar pago
+        IO.puts("Autorizando pago de #{id}...")
         GenServer.call(
           {:global, Libremarket.Pagos.Server},
           {:autorizar_pago, id}
         )
 
-        IO.puts("Autorizando pago de #{id}...")
+      {:pago_autorizado, id} ->
+        IO.puts("Pago autorizado para el id: #{id}.")
+
+      _ ->
+        # Manejo de otros mensajes no reconocidos
+        IO.puts("Mensaje no reconocido: #{inspect(eval_payload)}")
     end
 
-    # IO.puts("Mensaje recibido en pagos: #{inspect(:erlang.binary_to_term(payload))}")
     {:noreply, state}
   end
+
 
   @impl true
   def handle_info({:basic_consume_ok, _meta}, state) do
@@ -81,6 +85,8 @@ defmodule Libremarket.Pagos.MessageServer do
     # IO.puts("Mensaje enviado desde pagos: #{inspect(message)}")
     {:noreply, channel}
   end
+
+
 end
 
 defmodule Libremarket.Pagos.Server do

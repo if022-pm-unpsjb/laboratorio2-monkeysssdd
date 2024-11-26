@@ -29,10 +29,10 @@ defmodule Libremarket.Ventas do
       case se_autorizo_pago do
         :pago_autorizado ->
           enviar_producto(producto_id)
-        
+
         _ ->
               liberar_producto(producto_id)
-      end      
+      end
   end
 
   def liberar_producto(producto_id) do
@@ -46,7 +46,7 @@ defmodule Libremarket.Ventas do
       false
     end
   end
-  
+
   def enviar_producto(producto_id) do
     IO.puts("Ventas: Producto enviado #{inspect(producto_id)}")
     producto_id
@@ -88,7 +88,7 @@ defmodule Libremarket.Ventas.MessageServer do
     Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
     IO.puts("Mensaje enviado desde ventas: #{inspect(message)}")
-    IO.puts(queue_name)
+    # IO.puts(queue_name)
     {:noreply, channel}
   end
 
@@ -112,7 +112,7 @@ defmodule Libremarket.Ventas.MessageServer do
         )
 
         IO.puts("Ventas: Liberando producto #{inspect(id_compra)}: #{inspect(result)}")
-          
+
       {:actualizar_pago, id_compra, result} ->
         GenServer.call(
           {:global, Libremarket.Ventas.Server},
@@ -220,10 +220,9 @@ defmodule Libremarket.Ventas.Server do
   @impl true
   def handle_call({:hubo_infraccion, id_compra, infraccion}, _from, state) do
     result = Libremarket.Ventas.hubo_infraccion(id_compra, infraccion)
-
-    {:noreply, state}
+    {:reply, result, state}
   end
-  
+
   @impl true
   def handle_cast({:hubo_infraccion, id_compra}, state) do
 
