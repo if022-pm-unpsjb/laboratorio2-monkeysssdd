@@ -131,7 +131,7 @@ defmodule Libremarket.Envios.Server do
     # Enviar mensaje al servidor de compras
     GenServer.cast(
       {:global, Libremarket.Envios.MessageServer},
-      {:send_message, "compras", {:actualizar_costo, id, result}}
+      {:send_message, "compra", {:actualizar_costo, id, result}}
     )
 
     nuevo_estado =
@@ -149,7 +149,7 @@ defmodule Libremarket.Envios.Server do
     # Enviar mensaje al servidor de compras
     GenServer.cast(
       {:global, Libremarket.Envios.MessageServer},
-      {:send_message, "compras", {:actualizar_envio, id, result}}
+      {:send_message, "compra", {:actualizar_envio, id, result}}
     )
 
     nuevo_estado =

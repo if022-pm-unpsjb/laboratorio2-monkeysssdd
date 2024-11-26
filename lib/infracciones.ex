@@ -146,12 +146,7 @@ defmodule Libremarket.Infracciones.Server do
 
     GenServer.cast(
       {:global, Libremarket.Infracciones.MessageServer},
-      {:send_message, "compras", {:actualizar_infracciones, id_compra, result}}
-    )
-
-    GenServer.cast(
-      {:global, Libremarket.Infracciones.MessageServer},
-      {:send_message, "ventas", {:hubo_infraccion, id_compra, result}}
+      {:send_message, "compra", {:actualizar_infracciones, id_compra, result}}
     )
 
     # Libremarket.Infracciones.MessageServer.send_message(
@@ -159,6 +154,20 @@ defmodule Libremarket.Infracciones.Server do
     # )
 
     {:reply, result, [{id_producto, result} | state]}
+  end
+
+  @impl true
+  def handle_call({:detectar_infracciones, id}, _from, state) do
+    result = Libremarket.Infracciones.detectar_infracciones()
+
+    GenServer.cast(
+      {:global, Libremarket.Infracciones.MessageServer},
+      {:send_message, "compra", {:actualizar_infracciones, id, result}}
+    )
+
+    # Libremarket.Infracciones.MessageServer.send_message({:actualizar_infracciones, id, result})
+
+    {:reply, result, [{id, result} | state]}
   end
 
   @impl true

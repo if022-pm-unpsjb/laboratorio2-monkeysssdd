@@ -150,8 +150,8 @@ defmodule Libremarket.Compras.MessageServer do
     {:ok, channel} = Channel.open(connection)
 
     # Declarar una cola
-    queue_name = "new_compras_queue"
-    Queue.declare(channel, queue_name, durable: true)
+    queue_name = "new_compra_queue"
+    Queue.declare(channel, queue_name, durable: false)
 
     # Configurar el consumidor
     Basic.consume(channel, queue_name, nil, no_ack: true)
@@ -398,7 +398,6 @@ defmodule Libremarket.Compras.Server do
 
     if result == :waiting do
       Process.sleep(200)
-      #IO.puts("Esperando")
       GenServer.cast({:global, __MODULE__}, {:confirmar_compra3, id_compra})
 
       {:noreply, state}
