@@ -8,7 +8,7 @@ defmodule Libremarket.Test do
     # Process.sleep(:rand.uniform(3000) + 2000)
     Libremarket.Compras.Server.seleccionar_medio_pago(id_compra)
     # Process.sleep(:rand.uniform(3000) + 2000)
-    Libremarket.Compras.Server.confirmar_compra3(id_compra)
+    Libremarket.Compras.Server.confirmar_compra(id_compra)
   end
 
   def simular_compras(cantidad) do

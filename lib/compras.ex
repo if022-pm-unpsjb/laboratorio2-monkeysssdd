@@ -11,7 +11,7 @@ defmodule Libremarket.Compras do
     # infraccion = Libremarket.Compras.MessageServer.receive_message()
     GenServer.cast(
       {:global, Libremarket.Compras.MessageServer},
-      {:send_message, "ventas", {:reservar_producto, id_compra, id}}
+      {:send_message, "venta", {:reservar_producto, id}}
     )
 
     # reservado = Libremarket.Ventas.Server.reservar_producto(id)
@@ -49,7 +49,7 @@ defmodule Libremarket.Compras do
     end
   end
 
-  def confirmar_compra3(id, state) do
+  def confirmar_compra(id, state) do
     if Map.get(Map.get(state, "producto"), "infraccion") == nil do
       :waiting
     else
@@ -70,50 +70,6 @@ defmodule Libremarket.Compras do
     end
   end
 
-  def confirmar_compra(id, state) do
-    hay_infraccion = Map.get(Map.get(state, "producto"), "infraccion") == :hay_infraccion
-
-    IO.puts(inspect(Map.get(Map.get(state, "producto"), "infraccion")))
-
-    if hay_infraccion do
-      informar_infraccion(id)
-      %{"estado" => :error}
-    else
-      # pago_autorizado = elem(Libremarket.Pagos.Server.autorizarPago(id), 0)
-      GenServer.cast(
-        {:global, Libremarket.Compras.MessageServer},
-        {:send_message, "pagos", {:autorizar_pago, id}}
-      )
-
-      %{}
-    end
-  end
-
-  def confirmar_compra2(id, state) do
-    hay_infraccion = Map.get(Map.get(state, "producto"), "new_infracciones") == :error
-
-    if hay_infraccion do
-      informar_infraccion(id)
-      %{"estado" => :error}
-    else
-      pago_autorizado = elem(Libremarket.Pagos.Server.autorizarPago(id), 0)
-
-      if pago_autorizado == :pago_rechazado do
-        informar_pago_rechazado(id)
-        %{"estado" => :pago_rechazado}
-      else
-        correo = Map.get(state, "forma_entrega") == :correo
-
-        if correo do
-          Libremarket.Envios.Server.agendar_envio(id)
-        end
-
-        informar_confirmar_compra(id)
-        %{"estado" => :confirmada}
-      end
-    end
-  end
-
   def informar_confirmar_compra(id) do
     IO.puts("Compra " <> Integer.to_string(id) <> " confirmada con éxito")
   end
@@ -126,11 +82,11 @@ defmodule Libremarket.Compras do
   end
 
   def informar_pago_rechazado(id) do
-    IO.puts("Pago rechazado para la compra " <> Integer.to_string(id))
+    IO.puts("Compras: Pago rechazado para la compra " <> Integer.to_string(id))
   end
 
   def informar_infraccion(id) do
-    IO.puts("Infracción detectada para la compra " <> Integer.to_string(id))
+    IO.puts("Compras: Infracción detectada para la compra " <> Integer.to_string(id))
   end
 end
 
@@ -184,7 +140,7 @@ defmodule Libremarket.Compras.MessageServer do
           {:actualizar_infracciones, id_compra, infraccion}
         )
 
-        IO.puts("Actualizando infracción #{inspect(id_compra)}: #{inspect(infraccion)}")
+        IO.puts("Compras: Actualizando infracción #{inspect(id_compra)}: #{inspect(infraccion)}")
 
       {:actualizar_costo, id_compra, result} ->
         GenServer.call(
@@ -192,7 +148,7 @@ defmodule Libremarket.Compras.MessageServer do
           {:actualizar_costo, id_compra, result}
         )
 
-        IO.puts("Actualizando costo #{inspect(id_compra)}: #{inspect(result)}")
+        IO.puts("Compras: Actualizando costo #{inspect(id_compra)}: #{inspect(result)}")
 
       {:actualizar_pago, id_compra, result} ->
         GenServer.call(
@@ -200,7 +156,7 @@ defmodule Libremarket.Compras.MessageServer do
           {:actualizar_pago, id_compra, result}
         )
 
-        IO.puts("Actualizando pago #{inspect(id_compra)}: #{inspect(result)}")
+        IO.puts("Compras: Actualizando pago #{inspect(id_compra)}: #{inspect(result)}")
     end
 
     # IO.puts("RECIBIDO EN COMPRAS #{inspect(eval_payload)}")
@@ -250,11 +206,7 @@ defmodule Libremarket.Compras.Server do
   end
 
   def confirmar_compra(id_compra, pid \\ __MODULE__) do
-    GenServer.call({:global, __MODULE__}, {:confirmar_compra, id_compra})
-  end
-
-  def confirmar_compra3(id_compra, pid \\ __MODULE__) do
-    GenServer.cast({:global, __MODULE__}, {:confirmar_compra3, id_compra})
+    GenServer.cast({:global, __MODULE__}, {:confirmar_compra, id_compra})
   end
 
   def listar_compras(pid \\ __MODULE__) do
@@ -392,13 +344,13 @@ defmodule Libremarket.Compras.Server do
   end
 
   @impl true
-  def handle_cast({:confirmar_compra3, id_compra}, state) do
+  def handle_cast({:confirmar_compra, id_compra}, state) do
     actual_item_state = Map.get(state, id_compra)
     result = Libremarket.Compras.confirmar_compra3(id_compra, actual_item_state)
 
     if result == :waiting do
       Process.sleep(200)
-      GenServer.cast({:global, __MODULE__}, {:confirmar_compra3, id_compra})
+      GenServer.cast({:global, __MODULE__}, {:confirmar_compra, id_compra})
 
       {:noreply, state}
     else
@@ -407,16 +359,6 @@ defmodule Libremarket.Compras.Server do
 
       {:noreply, new_state}
     end
-  end
-
-  @impl true
-  def handle_call({:confirmar_compra, id_compra}, _from, state) do
-    actual_item_state = Map.get(state, id_compra)
-    result = Libremarket.Compras.confirmar_compra(id_compra, actual_item_state)
-    new_item_state = Map.merge(actual_item_state, result)
-    new_state = Map.put(state, id_compra, new_item_state)
-
-    {:reply, new_state, new_state}
   end
 
   @impl true

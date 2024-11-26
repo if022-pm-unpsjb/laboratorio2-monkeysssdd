@@ -58,7 +58,7 @@ defmodule Libremarket.Infracciones.MessageServer do
           {:detectar_infracciones, id_compra, id_producto}
         )
 
-        IO.puts("Detectando infracciones de #{id_compra}...")
+        IO.puts("Infracciones: Detectando infracciones de #{id_compra}...")
     end
 
     {:noreply, state}

@@ -24,15 +24,15 @@ defmodule Libremarket.Supervisor do
     ]
 
     children = [
-      Libremarket.Compras.Server,
-      Libremarket.Infracciones.Server,
-      Libremarket.Envios.Server,
+      # Libremarket.Compras.Server,
+      # Libremarket.Infracciones.Server,
+      # Libremarket.Envios.Server,
       Libremarket.Pagos.Server,
       Libremarket.Ventas.Server,
-      Libremarket.Infracciones.MessageServer,
-      Libremarket.Compras.MessageServer,
+      # Libremarket.Infracciones.MessageServer,
+      # Libremarket.Compras.MessageServer,
       Libremarket.Pagos.MessageServer,
-      Libremarket.Envios.MessageServer,
+      # Libremarket.Envios.MessageServer,
       Libremarket.Ventas.MessageServer,
       {Cluster.Supervisor, [topologies, [name: MyApp.ClusterSupervisor]]}
     ]

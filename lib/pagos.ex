@@ -58,7 +58,7 @@ defmodule Libremarket.Pagos.MessageServer do
           {:autorizar_pago, id}
         )
 
-        IO.puts("Autorizando pago de #{id}...")
+        IO.puts("Pagos: Autorizando pago de #{id}...")
     end
 
     # IO.puts("Mensaje recibido en pagos: #{inspect(:erlang.binary_to_term(payload))}")

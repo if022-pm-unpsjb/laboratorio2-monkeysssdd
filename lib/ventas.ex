@@ -94,13 +94,13 @@ defmodule Libremarket.Ventas.MessageServer do
         GenServer.call({:global, Libremarket.Ventas.Server}, {:enviar_producto, id_producto})
     end
 
-    IO.puts("Mensaje recibido en ventas: #{inspect(eval_payload)}")
+    # IO.puts("Mensaje recibido en ventas: #{inspect(eval_payload)}")
     {:noreply, state}
   end
 
   @impl true
   def handle_info({:basic_consume_ok, _meta}, state) do
-    IO.puts("RECIBIDO EN VENTAS BASIC_CONSUME")
+    # IO.puts("RECIBIDO EN VENTAS BASIC_CONSUME")
     {:noreply, state}
   end
 
@@ -110,11 +110,10 @@ defmodule Libremarket.Ventas.MessageServer do
     exchange_name = ""
     Basic.publish(channel, exchange_name, queue_name, :erlang.term_to_binary(message))
 
-    IO.puts("Mensaje enviado desde ventas: #{inspect(message)}")
+    # IO.puts("Mensaje enviado desde ventas: #{inspect(message)}")
     {:noreply, channel}
   end
 end
-
 
 defmodule Libremarket.Ventas.Server do
   use GenServer
@@ -145,7 +144,8 @@ defmodule Libremarket.Ventas.Server do
         {:ok, contenido}
 
       {:error, _} ->
-        estado_inicial = %{}  # Estado por defecto si no se puede leer el estado
+        # Estado por defecto si no se puede leer el estado
+        estado_inicial = %{}
         Process.send_after(self(), :persistir_estado, 60_000)
         {:ok, estado_inicial}
 
@@ -160,30 +160,37 @@ defmodule Libremarket.Ventas.Server do
   @impl true
   def handle_call({:reservar_producto, id}, _from, state) do
     result = Libremarket.Ventas.reservar_producto(id)
-    GenServer.cast(
-      {:global, Libremarket.Ventas.MessageServer},
-      {:send_message, "compra", {:actualizar_reserva, id, result}}
-    )
+    IO.puts("Ventas: Reservando producto #{inspect(id)}...")
+
+    # GenServer.cast(
+    #  {:global, Libremarket.Ventas.MessageServer},
+    #  {:send_message, "compra", {:actualizar_reserva, id, result}}
+    # )
+
     {:reply, result, [{id, result} | state]}
   end
 
   @impl true
   def handle_call({:liberar_producto, id}, _from, state) do
     result = Libremarket.Ventas.liberar_producto(id)
-    GenServer.cast(
-      {:global, Libremarket.Ventas.MessageServer},
-      {:send_message, "compra", {:actualizar_liberacion, id, result}}
-    )
+
+    # GenServer.cast(
+    #  {:global, Libremarket.Ventas.MessageServer},
+    #  {:send_message, "compra", {:actualizar_liberacion, id, result}}
+    # )
+
     {:reply, result, [{id, result} | state]}
   end
 
   @impl true
   def handle_call({:enviar_producto, id}, _from, state) do
     result = Libremarket.Ventas.enviar_producto(id)
-    GenServer.cast(
-      {:global, Libremarket.Ventas.MessageServer},
-      {:send_message, "compra", {:actualizar_envio, id, result}}
-    )
+
+    # GenServer.cast(
+    #  {:global, Libremarket.Ventas.MessageServer},
+    #  {:send_message, "compra", {:actualizar_envio, id, result}}
+    # )
+
     {:reply, result, [{id, result} | state]}
   end
 

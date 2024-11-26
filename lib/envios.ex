@@ -51,7 +51,7 @@ defmodule Libremarket.Envios.MessageServer do
           {:calcular_costo, id}
         )
 
-        IO.puts("Calculando costo de #{id}...")
+        IO.puts("Envíos: Calculando costo de #{id}...")
 
       {:agendar_envio, id} ->
         GenServer.call(
@@ -59,7 +59,7 @@ defmodule Libremarket.Envios.MessageServer do
           {:agendar_envio, id}
         )
 
-        IO.puts("Agendando envío de #{id}...")
+        IO.puts("Envíos: Agendando envío de #{id}...")
     end
 
     {:noreply, state}
